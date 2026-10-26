@@ -86,6 +86,18 @@ export interface GroqApiLog {
   userDeviceId?: string;
 }
 
+export interface GroqSettings {
+  id: string;
+  apiKey: string;
+  model: string;
+  visionModel: string;
+  isEnabled: boolean;
+  temperature: number;
+  maxTokens: number;
+  updatedAt: string;
+  updatedBy: string;
+}
+
 export interface AnalyticsSummary {
   totalScans: number;
   todayScans: number;

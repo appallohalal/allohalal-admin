@@ -15,40 +15,40 @@ interface HeaderProps {
 
 const TAB_TITLES: Record<NavTab, { title: string; desc: string }> = {
   dashboard: {
-    title: 'HalalLens Executive Dashboard',
-    desc: 'Real-time overview of mobile scans, AI moderation & growth.',
+    title: 'Dashboard',
+    desc: 'Overview of scans and activity',
   },
   products: {
-    title: 'Product Catalog & AI Moderation',
-    desc: 'Audit scanned items and manage manual overrides.',
+    title: 'Products',
+    desc: 'Catalog and review',
   },
   additives: {
-    title: 'E-Numbers & Additives Dictionary',
-    desc: 'Manage additives and 14-language rulings.',
+    title: 'Additives',
+    desc: 'E-numbers dictionary',
   },
   users: {
-    title: 'User Management & Devices',
-    desc: 'Track mobile accounts, quotas, and permissions.',
+    title: 'Users',
+    desc: 'App accounts and devices',
   },
   admins: {
-    title: 'Administrator & Staff Roles',
-    desc: 'Manage admin accounts, access permissions, and auditing staff.',
+    title: 'Admins',
+    desc: 'Team and roles',
   },
   admob: {
-    title: 'Google AdMob Remote Configuration',
-    desc: 'Live control over mobile AdMob unit IDs, test mode, format switches & frequency.',
+    title: 'AdMob',
+    desc: 'Ad unit configuration',
   },
   ads: {
-    title: 'Geo-Targeted Ads & Partnerships',
-    desc: 'Manage local sponsored banners by GPS radius.',
+    title: 'Geo Ads',
+    desc: 'Sponsored banners',
   },
   analytics: {
-    title: 'Analytics & Growth Dashboard',
-    desc: 'Scan compliance trends and user growth metrics.',
+    title: 'Analytics',
+    desc: 'Trends and metrics',
   },
   logs: {
-    title: 'Groq AI API Logs & Telemetry',
-    desc: 'Monitor LLM latency, token costs, and errors.',
+    title: 'Groq AI Logs & Telemetry',
+    desc: 'API logs and metrics',
   },
 };
 

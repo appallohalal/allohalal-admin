@@ -2,8 +2,6 @@
 
 import React, { useState } from 'react';
 import {
-  Smartphone,
-  Apple,
   Save,
   Check,
   Radio,
@@ -15,6 +13,8 @@ import {
 } from 'lucide-react';
 import { AdMobSettings } from '@/lib/types';
 import { DEFAULT_ADMOB_SETTINGS } from '@/lib/storage';
+
+import { APP_COLORS } from '@/lib/colors';
 
 interface AdMobSettingsProps {
   settings: AdMobSettings;
@@ -28,7 +28,6 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
   currentUser,
 }) => {
   const [form, setForm] = useState<AdMobSettings>(initialSettings || DEFAULT_ADMOB_SETTINGS);
-  const [platform, setPlatform] = useState<'android' | 'ios'>('android');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -48,24 +47,26 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
         updatedBy: currentUser?.name || 'Admin',
       });
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
+      setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err) {
       console.error('Failed to save AdMob settings:', err);
-      alert('Failed to save settings. Please try again.');
+      alert('Failed to save settings.');
     } finally {
       setIsSaving(false);
     }
   };
 
+  const c = APP_COLORS.classes;
+
   return (
-    <div className="max-w-4xl space-y-6 pb-16">
-      {/* 1. Master Ads On/Off Switch Card */}
+    <div className="max-w-4xl mx-auto space-y-6 pb-16">
+      {/* 1. Master Ads Switch */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div
             className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
               form.adsEnabled
-                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs'
+                ? `${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder} border shadow-xs`
                 : 'bg-slate-100 text-slate-400 border border-slate-200'
             }`}
           >
@@ -74,34 +75,32 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
           <div>
             <div className="flex items-center gap-2.5">
               <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                Master Advertisement Control
+                AdMob Status
               </h2>
               <span
                 className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-colors ${
                   form.adsEnabled
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    ? `${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`
                     : 'bg-slate-100 text-slate-600 border-slate-200'
                 }`}
               >
                 {form.adsEnabled ? 'Active' : 'Disabled'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-1 font-medium">
-              {form.adsEnabled
-                ? 'Advertisements are currently active across all mobile client apps.'
-                : 'All in-app advertisements are completely disabled for all users.'}
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">
+              {form.adsEnabled ? 'Ads active in mobile app' : 'Ads disabled'}
             </p>
           </div>
         </div>
 
-        {/* Premium iOS-style Toggle Switch */}
+        {/* Toggle Switch */}
         <button
           type="button"
           role="switch"
           aria-checked={form.adsEnabled}
           onClick={() => setForm((p) => ({ ...p, adsEnabled: !p.adsEnabled }))}
-          className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500/20 ${
-            form.adsEnabled ? 'bg-emerald-600' : 'bg-slate-200'
+          className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
+            form.adsEnabled ? c.primaryBg : 'bg-slate-200'
           }`}
         >
           <span className="sr-only">Toggle AdMob Status</span>
@@ -116,44 +115,10 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
 
       {/* 2. Ad Unit IDs Section */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-        {/* Header with Platform Selector */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-slate-100 gap-4">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-              AdMob Unit Identifiers
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Specify your Google AdMob Application ID and unit identifiers for each mobile platform.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200/80 self-start sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setPlatform('android')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 transition-all cursor-pointer ${
-                platform === 'android'
-                  ? 'bg-white text-emerald-700 shadow-xs border border-slate-200/50'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>Android</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPlatform('ios')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-2 transition-all cursor-pointer ${
-                platform === 'ios'
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/50'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Apple className="w-3.5 h-3.5" />
-              <span>iOS</span>
-            </button>
-          </div>
+        <div className="pb-4 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+            Ad Units
+          </h3>
         </div>
 
         {/* Input Fields Grid */}
@@ -162,18 +127,14 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
           <div className="md:col-span-2">
             <label className="text-xs font-bold text-slate-800 flex items-center gap-2 mb-2">
               <Layers className="w-3.5 h-3.5 text-slate-500" />
-              <span>AdMob App ID ({platform === 'android' ? 'Android' : 'iOS'})</span>
+              <span>App ID</span>
             </label>
             <input
               type="text"
               placeholder="ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY"
-              value={platform === 'android' ? form.androidAppId : form.iosAppId}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                if (platform === 'android') setForm((p) => ({ ...p, androidAppId: val }));
-                else setForm((p) => ({ ...p, iosAppId: val }));
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
+              value={form.androidAppId}
+              onChange={(e) => setForm((p) => ({ ...p, androidAppId: e.target.value.trim() }))}
+              className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`}
             />
           </div>
 
@@ -181,18 +142,14 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
           <div>
             <label className="text-xs font-bold text-slate-800 flex items-center gap-2 mb-2">
               <Layout className="w-3.5 h-3.5 text-slate-500" />
-              <span>Banner Ad Unit ID</span>
+              <span>Banner ID</span>
             </label>
             <input
               type="text"
               placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY"
-              value={platform === 'android' ? form.androidBannerId : form.iosBannerId}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                if (platform === 'android') setForm((p) => ({ ...p, androidBannerId: val }));
-                else setForm((p) => ({ ...p, iosBannerId: val }));
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
+              value={form.androidBannerId}
+              onChange={(e) => setForm((p) => ({ ...p, androidBannerId: e.target.value.trim() }))}
+              className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`}
             />
           </div>
 
@@ -200,18 +157,14 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
           <div>
             <label className="text-xs font-bold text-slate-800 flex items-center gap-2 mb-2">
               <Maximize2 className="w-3.5 h-3.5 text-slate-500" />
-              <span>Interstitial Ad Unit ID</span>
+              <span>Interstitial ID</span>
             </label>
             <input
               type="text"
               placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY"
-              value={platform === 'android' ? form.androidInterstitialId : form.iosInterstitialId}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                if (platform === 'android') setForm((p) => ({ ...p, androidInterstitialId: val }));
-                else setForm((p) => ({ ...p, iosInterstitialId: val }));
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
+              value={form.androidInterstitialId}
+              onChange={(e) => setForm((p) => ({ ...p, androidInterstitialId: e.target.value.trim() }))}
+              className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`}
             />
           </div>
 
@@ -219,18 +172,14 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
           <div>
             <label className="text-xs font-bold text-slate-800 flex items-center gap-2 mb-2">
               <Sparkles className="w-3.5 h-3.5 text-slate-500" />
-              <span>App Open Ad Unit ID</span>
+              <span>App Open ID</span>
             </label>
             <input
               type="text"
               placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY"
-              value={platform === 'android' ? form.androidAppOpenId : form.iosAppOpenId}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                if (platform === 'android') setForm((p) => ({ ...p, androidAppOpenId: val }));
-                else setForm((p) => ({ ...p, iosAppOpenId: val }));
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
+              value={form.androidAppOpenId}
+              onChange={(e) => setForm((p) => ({ ...p, androidAppOpenId: e.target.value.trim() }))}
+              className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`}
             />
           </div>
 
@@ -238,18 +187,14 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
           <div>
             <label className="text-xs font-bold text-slate-800 flex items-center gap-2 mb-2">
               <Layout className="w-3.5 h-3.5 text-slate-500" />
-              <span>Native Ad Unit ID</span>
+              <span>Native ID</span>
             </label>
             <input
               type="text"
               placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY"
-              value={platform === 'android' ? form.androidNativeId : form.iosNativeId}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                if (platform === 'android') setForm((p) => ({ ...p, androidNativeId: val }));
-                else setForm((p) => ({ ...p, iosNativeId: val }));
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
+              value={form.androidNativeId}
+              onChange={(e) => setForm((p) => ({ ...p, androidNativeId: e.target.value.trim() }))}
+              className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`}
             />
           </div>
 
@@ -257,18 +202,14 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
           <div className="md:col-span-2">
             <label className="text-xs font-bold text-slate-800 flex items-center gap-2 mb-2">
               <Award className="w-3.5 h-3.5 text-slate-500" />
-              <span>Rewarded Video Ad Unit ID</span>
+              <span>Rewarded ID</span>
             </label>
             <input
               type="text"
               placeholder="ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY"
-              value={platform === 'android' ? form.androidRewardedId : form.iosRewardedId}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                if (platform === 'android') setForm((p) => ({ ...p, androidRewardedId: val }));
-                else setForm((p) => ({ ...p, iosRewardedId: val }));
-              }}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400"
+              value={form.androidRewardedId}
+              onChange={(e) => setForm((p) => ({ ...p, androidRewardedId: e.target.value.trim() }))}
+              className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-mono text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`}
             />
           </div>
         </div>
@@ -279,7 +220,7 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="px-6 py-2.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer active:scale-98"
+            className={`px-6 py-2.5 text-xs font-bold rounded-xl ${c.primaryBg} ${c.primaryBgHover} text-white shadow-xs flex items-center gap-2 transition-all disabled:opacity-50 cursor-pointer active:scale-98`}
           >
             {isSaving ? (
               <>
@@ -289,12 +230,12 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
             ) : saveSuccess ? (
               <>
                 <Check className="w-4 h-4 text-white" />
-                <span>Changes Saved</span>
+                <span>Saved</span>
               </>
             ) : (
               <>
                 <Save className="w-4 h-4 text-white" />
-                <span>Save Changes</span>
+                <span>Save</span>
               </>
             )}
           </button>

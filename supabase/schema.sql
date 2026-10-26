@@ -291,10 +291,10 @@ VALUES
   'Sugar, unbleached enriched flour, palm oil, soybean oil, cocoa, high fructose corn syrup, baking soda, salt, soy lecithin (E322), vanillin.',
   ARRAY['E322'],
   'HALAL',
-  'HALAL',
-  TRUE,
-  'Plant-based formula verified, certified Halal packaging in Southeast Asian markets.',
-  'Mahmudul Hasan (Admin)',
+  NULL,
+  FALSE,
+  NULL,
+  NULL,
   1420
 ),
 (
@@ -305,10 +305,10 @@ VALUES
   'Glucose syrup, sugar, gelatin (E441), dextrose, citric acid, fruit concentrates, beeswax, carnauba wax.',
   ARRAY['E441', 'E901', 'E903'],
   'MUSHBOOH',
-  'HARAM',
-  TRUE,
-  'Contains European porcine (pork) gelatin in non-Turkish production batches. Strictly avoid.',
-  'Mahmudul Hasan (Admin)',
+  NULL,
+  FALSE,
+  NULL,
+  NULL,
   3892
 ),
 (
@@ -319,10 +319,10 @@ VALUES
   'Milk chocolate (sugar, cocoa butter, cocoa mass, skim milk powder), sugar, palm oil, wheat flour, hazelnuts, mono and diglycerides of fatty acids (E471), soy lecithin (E322), vanillin, salt.',
   ARRAY['E471', 'E322', 'E500'],
   'MUSHBOOH',
-  'HALAL',
-  TRUE,
-  'Ferrero confirmed 100% plant-origin mono- and diglycerides (palm oil derived) for this SKU.',
-  'Mahmudul Hasan (Admin)',
+  NULL,
+  FALSE,
+  NULL,
+  NULL,
   2510
 )
 ON CONFLICT (barcode) DO NOTHING;
@@ -390,6 +390,29 @@ CREATE POLICY "Allow all for admob_settings" ON public.admob_settings FOR ALL US
 
 INSERT INTO public.admob_settings (id, ads_enabled, test_mode)
 VALUES ('global', false, true)
+ON CONFLICT (id) DO NOTHING;
+
+-- ==============================================================================
+-- 12. Groq AI Remote Configuration Table
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.groq_settings (
+  id VARCHAR(64) PRIMARY KEY DEFAULT 'global',
+  api_key TEXT DEFAULT '',
+  model VARCHAR(64) DEFAULT 'llama-3.3-70b-versatile',
+  vision_model VARCHAR(64) DEFAULT 'llama-3.2-11b-vision-preview',
+  is_enabled BOOLEAN DEFAULT TRUE,
+  temperature DOUBLE PRECISION DEFAULT 0.1,
+  max_tokens INTEGER DEFAULT 2048,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by VARCHAR(128) DEFAULT 'Admin'
+);
+
+ALTER TABLE public.groq_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for groq_settings" ON public.groq_settings;
+CREATE POLICY "Allow all for groq_settings" ON public.groq_settings FOR ALL USING (true) WITH CHECK (true);
+
+INSERT INTO public.groq_settings (id, api_key, model, vision_model, is_enabled)
+VALUES ('global', '', 'llama-3.3-70b-versatile', 'llama-3.2-11b-vision-preview', true)
 ON CONFLICT (id) DO NOTHING;
 
 

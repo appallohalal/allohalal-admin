@@ -53,36 +53,63 @@ export async function GET(req: NextRequest) {
       test_ios_rewarded_id: 'ca-app-pub-3940256099942544/1712485313',
     };
 
-    const isTestMode = s.test_mode === true;
-    const isIos = platform === 'ios';
+    // Resolve direct Android unit IDs (Test or Production ID configured by admin)
+    const appId = (
+      s.android_app_id ||
+      s.test_android_app_id ||
+      'ca-app-pub-3940256099942544~3347511713'
+    ).trim();
 
-    // Pick active IDs based on mode (Test vs Production) and Platform
+    const bannerId = (
+      s.android_banner_id ||
+      s.test_android_banner_id ||
+      'ca-app-pub-3940256099942544/6300978111'
+    ).trim();
+
+    const interstitialId = (
+      s.android_interstitial_id ||
+      s.test_android_interstitial_id ||
+      'ca-app-pub-3940256099942544/1033173712'
+    ).trim();
+
+    const appOpenId = (
+      s.android_app_open_id ||
+      s.test_android_app_open_id ||
+      'ca-app-pub-3940256099942544/9257395921'
+    ).trim();
+
+    const nativeId = (
+      s.android_native_id ||
+      s.test_android_native_id ||
+      'ca-app-pub-3940256099942544/2247696110'
+    ).trim();
+
+    const rewardedId = (
+      s.android_rewarded_id ||
+      s.test_android_rewarded_id ||
+      'ca-app-pub-3940256099942544/5224354917'
+    ).trim();
+
     const activeIds = {
-      platform: isIos ? 'ios' : 'android',
-      appId: isTestMode
-        ? (isIos ? s.test_ios_app_id : s.test_android_app_id)
-        : (isIos ? s.ios_app_id : s.android_app_id),
-      bannerId: isTestMode
-        ? (isIos ? s.test_ios_banner_id : s.test_android_banner_id)
-        : (isIos ? s.ios_banner_id : s.android_banner_id),
-      interstitialId: isTestMode
-        ? (isIos ? s.test_ios_interstitial_id : s.test_android_interstitial_id)
-        : (isIos ? s.ios_interstitial_id : s.android_interstitial_id),
-      appOpenId: isTestMode
-        ? (isIos ? s.test_ios_app_open_id : s.test_android_app_open_id)
-        : (isIos ? s.ios_app_open_id : s.android_app_open_id),
-      nativeId: isTestMode
-        ? (isIos ? s.test_ios_native_id : s.test_android_native_id)
-        : (isIos ? s.ios_native_id : s.android_native_id),
-      rewardedId: isTestMode
-        ? (isIos ? s.test_ios_rewarded_id : s.test_android_rewarded_id)
-        : (isIos ? s.ios_rewarded_id : s.android_rewarded_id),
+      platform: 'android',
+      appId,
+      bannerId,
+      interstitialId,
+      appOpenId,
+      nativeId,
+      rewardedId,
     };
 
     return NextResponse.json({
       success: true,
       adsEnabled: s.ads_enabled === true,
-      testMode: isTestMode,
+      // Direct unit IDs for mobile app
+      appId,
+      bannerId,
+      interstitialId,
+      appOpenId,
+      nativeId,
+      rewardedId,
       formats: {
         banner: s.banner_enabled !== false,
         interstitial: s.interstitial_enabled !== false,
@@ -99,7 +126,6 @@ export async function GET(req: NextRequest) {
       raw: {
         id: s.id || 'global',
         adsEnabled: s.ads_enabled,
-        testMode: s.test_mode,
         bannerEnabled: s.banner_enabled,
         interstitialEnabled: s.interstitial_enabled,
         appOpenEnabled: s.app_open_enabled,
@@ -108,30 +134,12 @@ export async function GET(req: NextRequest) {
         interstitialIntervalScans: s.interstitial_interval_scans,
         appOpenCooldownMinutes: s.app_open_cooldown_minutes,
         bannerRefreshRateSeconds: s.banner_refresh_rate_seconds,
-        androidAppId: s.android_app_id || '',
-        androidBannerId: s.android_banner_id || '',
-        androidInterstitialId: s.android_interstitial_id || '',
-        androidAppOpenId: s.android_app_open_id || '',
-        androidNativeId: s.android_native_id || '',
-        androidRewardedId: s.android_rewarded_id || '',
-        iosAppId: s.ios_app_id || '',
-        iosBannerId: s.ios_banner_id || '',
-        iosInterstitialId: s.ios_interstitial_id || '',
-        iosAppOpenId: s.ios_app_open_id || '',
-        iosNativeId: s.ios_native_id || '',
-        iosRewardedId: s.ios_rewarded_id || '',
-        testAndroidAppId: s.test_android_app_id,
-        testAndroidBannerId: s.test_android_banner_id,
-        testAndroidInterstitialId: s.test_android_interstitial_id,
-        testAndroidAppOpenId: s.test_android_app_open_id,
-        testAndroidNativeId: s.test_android_native_id,
-        testAndroidRewardedId: s.test_android_rewarded_id,
-        testIosAppId: s.test_ios_app_id,
-        testIosBannerId: s.test_ios_banner_id,
-        testIosInterstitialId: s.test_ios_interstitial_id,
-        testIosAppOpenId: s.test_ios_app_open_id,
-        testIosNativeId: s.test_ios_native_id,
-        testIosRewardedId: s.test_ios_rewarded_id,
+        androidAppId: appId,
+        androidBannerId: bannerId,
+        androidInterstitialId: interstitialId,
+        androidAppOpenId: appOpenId,
+        androidNativeId: nativeId,
+        androidRewardedId: rewardedId,
         updatedAt: s.updated_at,
         updatedBy: s.updated_by,
       },
@@ -161,12 +169,12 @@ export async function POST(req: NextRequest) {
       interstitial_interval_scans: Number(body.interstitialIntervalScans) || 3,
       app_open_cooldown_minutes: Number(body.appOpenCooldownMinutes) || 15,
       banner_refresh_rate_seconds: Number(body.bannerRefreshRateSeconds) || 60,
-      android_app_id: (body.androidAppId || '').trim(),
-      android_banner_id: (body.androidBannerId || '').trim(),
-      android_interstitial_id: (body.androidInterstitialId || '').trim(),
-      android_app_open_id: (body.androidAppOpenId || '').trim(),
-      android_native_id: (body.androidNativeId || '').trim(),
-      android_rewarded_id: (body.androidRewardedId || '').trim(),
+      android_app_id: (body.androidAppId || body.appId || '').trim(),
+      android_banner_id: (body.androidBannerId || body.bannerId || '').trim(),
+      android_interstitial_id: (body.androidInterstitialId || body.interstitialId || '').trim(),
+      android_app_open_id: (body.androidAppOpenId || body.appOpenId || '').trim(),
+      android_native_id: (body.androidNativeId || body.nativeId || '').trim(),
+      android_rewarded_id: (body.androidRewardedId || body.rewardedId || '').trim(),
       ios_app_id: (body.iosAppId || '').trim(),
       ios_banner_id: (body.iosBannerId || '').trim(),
       ios_interstitial_id: (body.iosInterstitialId || '').trim(),

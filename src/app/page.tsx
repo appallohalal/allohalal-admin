@@ -9,7 +9,8 @@ import { AdditivesDictionary } from '@/components/modules/AdditivesDictionary';
 import { UserManagement } from '@/components/modules/UserManagement';
 import { AdminManagement } from '@/components/modules/AdminManagement';
 import { GeoAds } from '@/components/modules/GeoAds';
-import { AnalyticsLogs } from '@/components/modules/AnalyticsLogs';
+import { AnalyticsDashboard } from '@/components/modules/AnalyticsDashboard';
+import { GroqLogs } from '@/components/modules/GroqLogs';
 import { AdMobSettingsView } from '@/components/modules/AdMobSettings';
 import { AuthPage } from '@/components/auth/AuthPage';
 import { AdminUser, getStoredAuthUser, logoutAdmin } from '@/lib/auth';
@@ -30,8 +31,11 @@ import {
   fetchAdMobSettings,
   saveAdMobSettings,
   DEFAULT_ADMOB_SETTINGS,
+  fetchGroqSettings,
+  saveGroqSettings,
+  DEFAULT_GROQ_SETTINGS,
 } from '@/lib/storage';
-import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings } from '@/lib/types';
+import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings } from '@/lib/types';
 
 export default function AdminDashboardPage() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
@@ -45,6 +49,7 @@ export default function AdminDashboardPage() {
   const [ads, setAds] = useState<GeoAd[]>([]);
   const [logs, setLogs] = useState<GroqApiLog[]>([]);
   const [admobSettings, setAdmobSettings] = useState<AdMobSettings>(DEFAULT_ADMOB_SETTINGS);
+  const [groqSettings, setGroqSettings] = useState<GroqSettings>(DEFAULT_GROQ_SETTINGS);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Initialize data and real Supabase Auth session on mount
@@ -58,13 +63,14 @@ export default function AdminDashboardPage() {
           setCurrentUser(user);
         }
 
-        const [prods, adds, usrs, adList, logList, admob] = await Promise.all([
+        const [prods, adds, usrs, adList, logList, admob, groq] = await Promise.all([
           fetchProducts(),
           fetchAdditives(),
           fetchUsers(),
           fetchAds(),
           fetchLogs(),
           fetchAdMobSettings(),
+          fetchGroqSettings(),
         ]);
         if (isMounted) {
           setProducts(prods);
@@ -73,6 +79,7 @@ export default function AdminDashboardPage() {
           setAds(adList);
           setLogs(logList);
           setAdmobSettings(admob);
+          setGroqSettings(groq);
         }
       } catch (err) {
         console.error('Error loading Supabase data:', err);
@@ -148,6 +155,11 @@ export default function AdminDashboardPage() {
   const handleSaveAdMob = async (newSettings: AdMobSettings) => {
     const updated = await saveAdMobSettings(newSettings, currentUser?.name || 'Admin');
     setAdmobSettings(updated);
+  };
+
+  const handleSaveGroqSettings = async (newSettings: GroqSettings) => {
+    const updated = await saveGroqSettings(newSettings, currentUser?.name || 'Admin');
+    setGroqSettings(updated);
   };
 
   const handleLogout = async () => {
@@ -271,18 +283,22 @@ export default function AdminDashboardPage() {
             )}
 
             {activeTab === 'analytics' && (
-              <AnalyticsLogs
-                logs={logs}
+              <AnalyticsDashboard
                 products={products}
                 users={users}
+                additives={additives}
               />
             )}
 
             {activeTab === 'logs' && (
-              <AnalyticsLogs
+              <GroqLogs
                 logs={logs}
-                products={products}
-                users={users}
+                settings={groqSettings}
+                onSaveSettings={handleSaveGroqSettings}
+                onRefreshLogs={async () => {
+                  const updatedLogs = await fetchLogs();
+                  setLogs(updatedLogs);
+                }}
               />
             )}
           </div>
