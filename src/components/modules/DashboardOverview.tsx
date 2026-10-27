@@ -44,38 +44,95 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onQuickVerify,
 }) => {
   const [timeframe, setTimeframe] = useState<'7D' | '30D'>('7D');
-  const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(4); // default hovered on Friday peak
+  const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
 
-  // Aggregate Metrics
-  const totalScans = products.reduce((acc, p) => acc + p.scansCount, 0);
+  // Aggregate Metrics (100% Real Live Data)
+  const totalCatalogScans = products.reduce((acc, p) => acc + (p.scansCount || 0), 0);
+  const totalScans = Math.max(totalCatalogScans, logs.length);
   const pendingReviews = products.filter((p) => (p.manualStatus || p.aiStatus) === 'MUSHBOOH');
   const halalCount = products.filter((p) => (p.manualStatus || p.aiStatus) === 'HALAL').length;
   const haramCount = products.filter((p) => (p.manualStatus || p.aiStatus) === 'HARAM').length;
   const premiumCount = users.filter((u) => u.isPremium).length;
   const activeAdsCount = ads.filter((a) => a.isActive).length;
 
-  const avgLatency = Math.round(
-    logs.reduce((acc, l) => acc + l.latencyMs, 0) / (logs.length || 1)
-  );
+  const avgLatency = logs.length > 0
+    ? Math.round(logs.reduce((acc, l) => acc + (l.latencyMs || 0), 0) / logs.length)
+    : 0;
 
-  // 7 Days Data
-  const data7D = [
-    { label: 'Mon', fullLabel: 'Monday', scans: 1840, halal: 1380, x: 20, y: 110 },
-    { label: 'Tue', fullLabel: 'Tuesday', scans: 2420, halal: 1820, x: 110, y: 82 },
-    { label: 'Wed', fullLabel: 'Wednesday', scans: 2100, halal: 1590, x: 200, y: 96 },
-    { label: 'Thu', fullLabel: 'Thursday', scans: 2890, halal: 2210, x: 290, y: 58 },
-    { label: 'Fri', fullLabel: 'Friday (Jummah)', scans: 3450, halal: 2790, x: 380, y: 28 }, // Peak
-    { label: 'Sat', fullLabel: 'Saturday', scans: 3120, halal: 2460, x: 470, y: 44 },
-    { label: 'Sun', fullLabel: 'Sunday', scans: 2780, halal: 2180, x: 560, y: 64 },
-  ];
+  // Real 7 Days Data (Dynamic from live logs timestamps)
+  const data7D = React.useMemo(() => {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
 
-  // 30 Days Data (Weekly segments)
-  const data30D = [
-    { label: 'Week 1', fullLabel: 'Oct 1 - 7', scans: 14200, halal: 10650, x: 30, y: 105 },
-    { label: 'Week 2', fullLabel: 'Oct 8 - 14', scans: 16800, halal: 12900, x: 205, y: 75 },
-    { label: 'Week 3', fullLabel: 'Oct 15 - 21', scans: 18600, halal: 14430, x: 385, y: 40 },
-    { label: 'Week 4', fullLabel: 'Oct 22 - 28', scans: 21400, halal: 16980, x: 560, y: 20 },
-  ];
+    const points = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (6 - i));
+      const startOfDay = new Date(d);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(d);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const dayLogs = logs.filter((l) => {
+        const t = new Date(l.timestamp).getTime();
+        return t >= startOfDay.getTime() && t <= endOfDay.getTime();
+      });
+
+      const successDayLogs = dayLogs.filter((l) => l.status === 'SUCCESS');
+
+      return {
+        label: dayNames[d.getDay()],
+        fullLabel: d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' }),
+        scans: dayLogs.length,
+        halal: successDayLogs.length,
+        x: 20 + i * 90,
+        y: 135,
+      };
+    });
+
+    const maxScans = Math.max(...points.map((p) => p.scans), 1);
+    return points.map((p) => ({
+      ...p,
+      y: p.scans === 0 ? 135 : Math.round(135 - (p.scans / maxScans) * 105),
+    }));
+  }, [logs]);
+
+  // Real 30 Days Data (Dynamic 4 weekly windows from live logs)
+  const data30D = React.useMemo(() => {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999);
+
+    const points = Array.from({ length: 4 }, (_, i) => {
+      const start = new Date(today);
+      start.setDate(today.getDate() - (28 - i * 7));
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+
+      const weekLogs = logs.filter((l) => {
+        const t = new Date(l.timestamp).getTime();
+        return t >= start.getTime() && t <= end.getTime();
+      });
+
+      const successWeekLogs = weekLogs.filter((l) => l.status === 'SUCCESS');
+
+      return {
+        label: `Week ${i + 1}`,
+        fullLabel: `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
+        scans: weekLogs.length,
+        halal: successWeekLogs.length,
+        x: 30 + i * 175,
+        y: 135,
+      };
+    });
+
+    const maxScans = Math.max(...points.map((p) => p.scans), 1);
+    return points.map((p) => ({
+      ...p,
+      y: p.scans === 0 ? 135 : Math.round(135 - (p.scans / maxScans) * 105),
+    }));
+  }, [logs]);
 
   const currentChartData = timeframe === '7D' ? data7D : data30D;
   const activeDataPoint = hoveredPointIndex !== null && currentChartData[hoveredPointIndex]
@@ -96,27 +153,31 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   };
 
   const linePath = generateSmoothPath(currentChartData);
-  const areaPath = `${linePath} L ${currentChartData[currentChartData.length - 1].x} 150 L ${currentChartData[0].x} 150 Z`;
+  const areaPath = currentChartData.length > 0
+    ? `${linePath} L ${currentChartData[currentChartData.length - 1].x} 150 L ${currentChartData[0].x} 150 Z`
+    : '';
+
+  const totalPeriodScans = currentChartData.reduce((sum, d) => sum + d.scans, 0);
 
   return (
     <div className="space-y-6 max-w-7xl">
-      {/* 4 Minimal Metric Cards */}
+      {/* 4 Minimal Metric Cards (100% Real Live Data) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Scans */}
         <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs">
           <div className="text-xs font-medium text-slate-500">Total Scans</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
+          <div className="text-2xl font-bold text-slate-900 mt-1.5 font-mono">
             {totalScans.toLocaleString()}
           </div>
-          <div className="text-[11px] text-emerald-700 font-semibold mt-1">
-            +18.2% <span className="text-slate-400 font-normal">vs last week</span>
+          <div className="text-[11px] text-slate-500 font-medium mt-1">
+            <span className="font-semibold text-emerald-700">{logs.length}</span> live AI inference traces
           </div>
         </div>
 
         {/* Pending Review */}
         <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs">
           <div className="text-xs font-medium text-slate-500">Pending Review</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
+          <div className="text-2xl font-bold text-slate-900 mt-1.5 font-mono">
             {pendingReviews.length}
           </div>
           <div className="text-[11px] text-amber-700 font-semibold mt-1">
@@ -126,12 +187,12 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
 
         {/* Registered Users */}
         <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs">
-          <div className="text-xs font-medium text-slate-500">Active Mobile Devices</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
-            {(users.length * 1420).toLocaleString()}
+          <div className="text-xs font-medium text-slate-500">Registered App Users</div>
+          <div className="text-2xl font-bold text-slate-900 mt-1.5 font-mono">
+            {users.length.toLocaleString()}
           </div>
           <div className="text-[11px] text-slate-500 font-medium mt-1">
-            <span className="font-semibold text-slate-700">{premiumCount * 128}</span> Pro accounts
+            <span className="font-semibold text-purple-700">{premiumCount}</span> Pro subscribers
           </div>
         </div>
 
@@ -142,7 +203,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             {avgLatency} <span className="text-xs font-normal text-slate-400">ms</span>
           </div>
           <div className="text-[11px] text-slate-500 font-medium mt-1">
-            GPT-OSS-120B / Qwen
+            Real latency from live logs
           </div>
         </div>
       </div>
@@ -154,39 +215,41 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900">Weekly Scan Volume</h3>
+                <h3 className="text-sm font-bold text-slate-900">Scan Volume & AI Activity</h3>
                 <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                  +14.5% Growth
+                  {totalPeriodScans} Scans Recorded
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                Daily volume of product ingredients processed by Groq AI and cached
+                Real-time barcode scans and ingredient analyses recorded in Supabase
               </p>
             </div>
 
             {/* Timeframe Toggle Buttons */}
             <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs">
               <button
+                type="button"
                 onClick={() => {
                   setTimeframe('7D');
-                  setHoveredPointIndex(4);
+                  setHoveredPointIndex(null);
                 }}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                   timeframe === '7D'
-                    ? 'bg-white text-slate-900 shadow-2xs'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 7 Days
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setTimeframe('30D');
-                  setHoveredPointIndex(3);
+                  setHoveredPointIndex(null);
                 }}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
                   timeframe === '30D'
-                    ? 'bg-white text-slate-900 shadow-2xs'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
                     : 'text-slate-500 hover:text-slate-800'
                 }`}
               >

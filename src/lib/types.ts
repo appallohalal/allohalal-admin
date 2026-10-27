@@ -42,10 +42,12 @@ export interface Additive {
 
 export interface UserAccount {
   id: string;
-  deviceId: string;
+  deviceId?: string;
   email?: string;
   name?: string;
+  username?: string;
   country: string;
+  city?: string;
   isPremium: boolean;
   isBanned: boolean;
   banReason?: string;
@@ -160,6 +162,15 @@ export interface AdMobSettings {
   testIosNativeId: string;
   testIosRewardedId: string;
 
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface AuthSettings {
+  id: string;
+  forceUserAuth: boolean;
+  allowGuestScan: boolean;
+  requireEmailVerification?: boolean;
   updatedAt: string;
   updatedBy: string;
 }

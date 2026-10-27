@@ -1,6 +1,6 @@
 'use client';
 
-import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings } from './types';
+import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings } from './types';
 import { supabase } from './supabase';
 
 const STORAGE_KEYS = {
@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   LOGS: 'halallens_supabase_logs',
   ADMOB: 'halallens_supabase_admob',
   GROQ_SETTINGS: 'halallens_supabase_groq_settings',
+  AUTH_SETTINGS: 'halallens_supabase_auth_settings',
 };
 
 // ==========================================
@@ -175,7 +176,9 @@ export const fetchUsers = async (): Promise<UserAccount[]> => {
         deviceId: item.device_id,
         email: item.email,
         name: item.name,
+        username: item.username,
         country: item.country || 'Unknown',
+        city: item.city || '',
         isPremium: item.is_premium || false,
         isBanned: item.is_banned || false,
         banReason: item.ban_reason,
@@ -213,7 +216,7 @@ export const toggleUserBan = async (userId: string, reason?: string): Promise<Us
         .from('users')
         .update({
           is_banned: newBannedState,
-          ban_reason: newBannedState ? (reason || 'Violation of terms') : null,
+          ban_reason: newBannedState ? (reason?.trim() || 'Terms of Service & Community Guidelines violation') : null,
         })
         .eq('id', userId);
     } catch (err) {
@@ -343,7 +346,7 @@ export const fetchLogs = async (): Promise<GroqApiLog[]> => {
       .from('groq_api_logs')
       .select('*')
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(500);
 
     if (!error && data) {
       const mapped: GroqApiLog[] = data.map((item: any) => ({
@@ -649,5 +652,92 @@ export const saveGroqSettings = async (
   }
 
   return fetchGroqSettings();
+};
+
+// ==========================================
+// 8. MOBILE AUTH FEATURE TOGGLE (Supabase integration)
+// ==========================================
+
+export const DEFAULT_AUTH_SETTINGS: AuthSettings = {
+  id: 'global',
+  forceUserAuth: false,
+  allowGuestScan: true,
+  requireEmailVerification: false,
+  updatedAt: new Date().toISOString(),
+  updatedBy: 'Admin',
+};
+
+export const fetchAuthSettings = async (): Promise<AuthSettings> => {
+  try {
+    const { data, error } = await supabase
+      .from('auth_settings')
+      .select('*')
+      .eq('id', 'global')
+      .maybeSingle();
+
+    if (!error && data) {
+      const mapped: AuthSettings = {
+        id: data.id,
+        forceUserAuth: data.force_user_auth === true,
+        allowGuestScan: data.allow_guest_scan !== false,
+        requireEmailVerification: data.require_email_verification === true,
+        updatedAt: data.updated_at || new Date().toISOString(),
+        updatedBy: data.updated_by || 'Admin',
+      };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.AUTH_SETTINGS, JSON.stringify(mapped));
+      }
+      return mapped;
+    }
+  } catch (err) {
+    console.warn('Supabase fetch Auth settings note:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(STORAGE_KEYS.AUTH_SETTINGS);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (_) {}
+    }
+  }
+
+  return DEFAULT_AUTH_SETTINGS;
+};
+
+export const saveAuthSettings = async (
+  settings: AuthSettings,
+  updatedBy: string = 'Admin'
+): Promise<AuthSettings> => {
+  const payload = {
+    id: 'global',
+    force_user_auth: settings.forceUserAuth,
+    allow_guest_scan: !settings.forceUserAuth,
+    require_email_verification: Boolean(settings.requireEmailVerification),
+    updated_at: new Date().toISOString(),
+    updated_by: updatedBy,
+  };
+
+  try {
+    const { error } = await supabase.from('auth_settings').upsert(payload);
+    if (error) {
+      console.error('Error saving Auth settings to Supabase:', error);
+      throw error;
+    }
+  } catch (err) {
+    console.warn('Supabase save Auth settings warning:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const updated: AuthSettings = {
+      ...settings,
+      allowGuestScan: !settings.forceUserAuth,
+      updatedAt: payload.updated_at,
+      updatedBy,
+    };
+    localStorage.setItem(STORAGE_KEYS.AUTH_SETTINGS, JSON.stringify(updated));
+  }
+
+  return fetchAuthSettings();
 };
 

@@ -4,25 +4,25 @@ import React, { useState, useEffect } from 'react';
 import { GroqApiLog, GroqSettings } from '@/lib/types';
 import { DEFAULT_GROQ_SETTINGS } from '@/lib/storage';
 import { APP_COLORS } from '@/lib/colors';
+import { toast } from '@/lib/toast';
 import {
   Terminal,
   Zap,
   Cpu,
-  Search,
   CheckCircle2,
   XCircle,
   AlertTriangle,
   Copy,
   Check,
   Sparkles,
-  X,
   Key,
   Eye,
   EyeOff,
   Save,
-  RefreshCw,
   Play,
   Activity,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface GroqLogsProps {
@@ -55,26 +55,24 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const [testResult, setTestResult] = useState<{
-    testing: boolean;
-    success?: boolean;
-    latencyMs?: number;
-    model?: string;
-    error?: string;
-  } | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'RATE_LIMITED' | 'ERROR'>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLog, setSelectedLog] = useState<GroqApiLog | null>(null);
   const [copied, setCopied] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (initialSettings) {
       setForm(initialSettings);
     }
   }, [initialSettings]);
+
+  // Reset to first page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
 
   const handleSaveSettings = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -85,9 +83,10 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
     try {
       await onSaveSettings(form);
       setSaveSuccess(true);
+      toast.success('Groq AI API settings and models saved successfully.', 'Settings Saved');
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err: any) {
-      alert(`Save failed: ${err.message || err}`);
+      toast.error(`Save failed: ${err.message || err}`, 'Save Error');
     } finally {
       setIsSaving(false);
     }
@@ -95,11 +94,13 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
 
   const handleTestConnection = async () => {
     if (!form.apiKey.trim()) {
-      alert('Please enter a Groq API Key.');
+      toast.error('Please enter a Groq API Key before testing.', 'API Key Required');
       return;
     }
 
-    setTestResult({ testing: true });
+    const toastId = toast.loading('Testing Groq AI connection...', 'Connection Test');
+    setIsTesting(true);
+
     try {
       if (onSaveSettings) {
         await onSaveSettings(form);
@@ -112,42 +113,26 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
           productName: 'Test Product',
           ingredientsText: 'Wheat, water, salt',
           language: 'English',
-          barcode: 'TEST',
+          barcode: 'TEST-PING',
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setTestResult({
-          testing: false,
-          success: true,
-          latencyMs: data.telemetry?.latencyMs || 200,
-          model: data.telemetry?.model || form.model,
-        });
+        const latency = data.telemetry?.latencyMs || 200;
+        const model = data.telemetry?.model || form.model;
+        toast.dismiss(toastId);
+        toast.success(`Connected (${latency}ms) • ${model}`, 'Connection Verified');
         if (onRefreshLogs) onRefreshLogs();
       } else {
-        setTestResult({
-          testing: false,
-          success: false,
-          error: data.error || 'Connection failed',
-        });
+        toast.dismiss(toastId);
+        toast.error(data.error || 'Connection failed. Please verify API key.', 'Connection Error');
       }
     } catch (err: any) {
-      setTestResult({
-        testing: false,
-        success: false,
-        error: err.message || 'Network error',
-      });
-    }
-  };
-
-  const handleManualRefresh = async () => {
-    if (!onRefreshLogs) return;
-    setIsRefreshing(true);
-    try {
-      await onRefreshLogs();
+      toast.dismiss(toastId);
+      toast.error(err.message || 'Network error occurred during test.', 'Connection Error');
     } finally {
-      setIsRefreshing(false);
+      setIsTesting(false);
     }
   };
 
@@ -161,17 +146,12 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
   );
   const successRate = totalLogs > 0 ? Math.round((successLogs / totalLogs) * 100) : 100;
 
-  const filteredLogs = logs.filter((log) => {
-    if (statusFilter !== 'ALL' && log.status !== statusFilter) return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      log.endpoint.toLowerCase().includes(q) ||
-      (log.barcode && log.barcode.toLowerCase().includes(q)) ||
-      log.model.toLowerCase().includes(q) ||
-      (log.errorMessage && log.errorMessage.toLowerCase().includes(q))
-    );
-  });
+  const filteredLogs = statusFilter === 'ALL' ? logs : logs.filter((log) => log.status === statusFilter);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, filteredLogs.length);
+  const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
 
   const handleCopyLog = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -271,54 +251,20 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
             </div>
           </div>
 
-          {/* Test Status Banner */}
-          {testResult && (
-            <div
-              className={`p-3 rounded-xl border flex items-center justify-between text-xs ${
-                testResult.testing
-                  ? 'bg-slate-50 border-slate-200 text-slate-700'
-                  : testResult.success
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                  : 'bg-rose-50 border-rose-200 text-rose-800'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {testResult.testing ? (
-                  <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                ) : testResult.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                ) : (
-                  <XCircle className="w-4 h-4 text-rose-600" />
-                )}
-                <span>
-                  {testResult.testing
-                    ? 'Testing connection...'
-                    : testResult.success
-                    ? `Connected (${testResult.latencyMs}ms) • ${testResult.model}`
-                    : `Error: ${testResult.error}`}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setTestResult(null)}
-                className="text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
           {/* Action Buttons */}
           <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={handleTestConnection}
-              disabled={testResult?.testing || !form.apiKey}
+              disabled={isTesting || !form.apiKey}
               className="px-4 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
             >
-              <Play className={`w-3.5 h-3.5 ${c.primaryText}`} />
-              <span>Test Connection</span>
+              {isTesting ? (
+                <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Play className={`w-3.5 h-3.5 ${c.primaryText}`} />
+              )}
+              <span>{isTesting ? 'Testing...' : 'Test Connection'}</span>
             </button>
 
             <button
@@ -443,29 +389,6 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
               Errors ({errorLogs})
             </button>
           </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white ${c.primaryFocus} focus:outline-none w-44`}
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleManualRefresh}
-              disabled={isRefreshing}
-              className="p-2 text-xs rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-all cursor-pointer disabled:opacity-50"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? `animate-spin ${c.primaryText}` : ''}`} />
-            </button>
-          </div>
         </div>
 
         {/* Table */}
@@ -479,18 +402,17 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
                 <th className="py-2.5 px-4">Status</th>
                 <th className="py-2.5 px-4 text-center">Tokens</th>
                 <th className="py-2.5 px-4 text-right">Latency</th>
-                <th className="py-2.5 px-4 text-right">Inspect</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-mono text-xs">
               {filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400 font-sans text-xs">
+                  <td colSpan={6} className="py-8 text-center text-slate-400 font-sans text-xs">
                     No logs found
                   </td>
                 </tr>
               ) : (
-                filteredLogs.map((log) => (
+                paginatedLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-2.5 px-4 text-slate-500 whitespace-nowrap">
                       {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
@@ -534,92 +456,82 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
                     <td className="py-2.5 px-4 text-right font-medium whitespace-nowrap">
                       {log.latencyMs}ms
                     </td>
-
-                    <td className="py-2.5 px-4 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => setSelectedLog(log)}
-                        className="px-2.5 py-1 text-[11px] rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold border border-slate-200 transition-colors cursor-pointer"
-                      >
-                        View
-                      </button>
-                    </td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* 4. Modal */}
-      {selectedLog && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-5 shadow-xl space-y-3.5 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-              <h4 className="text-sm font-bold text-slate-900">Trace Details</h4>
-              <button
-                onClick={() => setSelectedLog(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+        {/* Pagination Footer */}
+        {filteredLogs.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-3.5 border-t border-slate-100 bg-slate-50/60">
+            <div className="text-xs text-slate-500 font-medium font-sans">
+              Showing <span className="font-semibold text-slate-800">{startIndex + 1}</span> to{' '}
+              <span className="font-semibold text-slate-800">{endIndex}</span> of{' '}
+              <span className="font-semibold text-slate-800">{filteredLogs.length}</span> logs
             </div>
 
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Time:</span>
-                <span className="text-slate-900 font-semibold">{selectedLog.timestamp}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Endpoint:</span>
-                <span className="text-slate-900 font-semibold">{selectedLog.endpoint}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Model:</span>
-                <span className={`font-semibold ${c.primaryText}`}>{selectedLog.model}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Latency:</span>
-                <span className="text-slate-900 font-semibold">{selectedLog.latencyMs}ms</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Tokens:</span>
-                <span className="text-slate-900 font-semibold">
-                  {selectedLog.promptTokens} prompt + {selectedLog.completionTokens} completion
-                </span>
-              </div>
-              {selectedLog.barcode && (
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Barcode:</span>
-                  <span className="text-slate-900 font-semibold">{selectedLog.barcode}</span>
-                </div>
-              )}
-              {selectedLog.errorMessage && (
-                <div className="pt-2 border-t border-slate-200 text-rose-700 leading-relaxed font-sans">
-                  <span className="font-bold">Error:</span> {selectedLog.errorMessage}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-1.5 font-sans">
               <button
-                onClick={() => handleCopyLog(JSON.stringify(selectedLog, null, 2))}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Copied' : 'Copy JSON'}</span>
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Prev</span>
               </button>
 
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((page) => {
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .reduce<(number | string)[]>((acc, page, idx, arr) => {
+                    if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                      acc.push('...');
+                    }
+                    acc.push(page);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="px-1 text-xs text-slate-400">
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={`page-${item}`}
+                        type="button"
+                        onClick={() => setCurrentPage(item as number)}
+                        className={`w-7 h-7 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                          currentPage === item
+                            ? `${c.primaryBg} text-white shadow-2xs`
+                            : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+              </div>
+
               <button
-                onClick={() => setSelectedLog(null)}
-                className={`px-4 py-1.5 rounded-xl ${c.primaryBg} ${c.primaryBgHover} text-white text-xs font-bold shadow-xs cursor-pointer`}
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-2xs cursor-pointer"
               >
-                Close
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

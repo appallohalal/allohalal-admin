@@ -121,6 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
 
           return (
             <button
+              type="button"
               key={item.id}
               onClick={() => onTabChange(item.id)}
               className={`w-full text-left flex items-center px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${

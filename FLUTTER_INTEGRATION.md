@@ -139,6 +139,28 @@ Future<void> syncRemoteAdMobConfig() async {
   } catch (e) {
     debugPrint('AdMob remote sync failed, using fallback: $e');
   }
+```
+
+---
+
+## 6. Mandatory Account Creation / Force User Authentication Remote Feature Toggle
+
+Control whether mobile users can scan freely without an account (V1 default: optional) or are required to log in / register.
+
+### Remote Endpoints:
+- `GET /api/v1/auth/config`: Returns `{ forceUserAuth: boolean, allowGuestScan: boolean }`
+- `POST /api/v1/auth/config`: Toggles the policy in real-time from the Admin Panel
+- `POST /api/v1/auth/mobile/register`: Accepts Name, Username, Email, Password, Country, City
+- `POST /api/v1/auth/mobile/login`: Authenticates with Email & Password
+
+### Mobile App Integration (`scanner/lib/config/auth_config.dart` & `services/auth_service.dart`):
+```dart
+// 1. Sync remote feature toggle on app launch:
+await AuthConfig.syncFromBackend();
+
+// 2. Check if authentication is required before scanning:
+if (AuthConfig.isForceUserAuth && !AuthService.instance.isLoggedIn) {
+  // Direct user to AuthScreen
 }
 ```
 

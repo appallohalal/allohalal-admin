@@ -15,6 +15,7 @@ import { AdMobSettings } from '@/lib/types';
 import { DEFAULT_ADMOB_SETTINGS } from '@/lib/storage';
 
 import { APP_COLORS } from '@/lib/colors';
+import { toast } from '@/lib/toast';
 
 interface AdMobSettingsProps {
   settings: AdMobSettings;
@@ -47,10 +48,11 @@ export const AdMobSettingsView: React.FC<AdMobSettingsProps> = ({
         updatedBy: currentUser?.name || 'Admin',
       });
       setSaveSuccess(true);
+      toast.success('AdMob configuration saved successfully.', 'Settings Saved');
       setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save AdMob settings:', err);
-      alert('Failed to save settings.');
+      toast.error(err.message || 'Failed to save settings.', 'Save Error');
     } finally {
       setIsSaving(false);
     }

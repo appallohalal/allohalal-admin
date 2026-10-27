@@ -34,8 +34,24 @@ import {
   fetchGroqSettings,
   saveGroqSettings,
   DEFAULT_GROQ_SETTINGS,
+  fetchAuthSettings,
+  saveAuthSettings,
+  DEFAULT_AUTH_SETTINGS,
 } from '@/lib/storage';
-import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings } from '@/lib/types';
+import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings } from '@/lib/types';
+import { ToastContainer } from '@/components/ui/ToastContainer';
+
+const VALID_TABS: NavTab[] = [
+  'dashboard',
+  'products',
+  'additives',
+  'users',
+  'admins',
+  'admob',
+  'ads',
+  'analytics',
+  'logs',
+];
 
 export default function AdminDashboardPage() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
@@ -50,7 +66,49 @@ export default function AdminDashboardPage() {
   const [logs, setLogs] = useState<GroqApiLog[]>([]);
   const [admobSettings, setAdmobSettings] = useState<AdMobSettings>(DEFAULT_ADMOB_SETTINGS);
   const [groqSettings, setGroqSettings] = useState<GroqSettings>(DEFAULT_GROQ_SETTINGS);
+  const [authSettings, setAuthSettings] = useState<AuthSettings>(DEFAULT_AUTH_SETTINGS);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  // Restore and sync active tab from URL hash and localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncTab = () => {
+      const hash = window.location.hash.replace('#', '') as NavTab;
+      if (VALID_TABS.includes(hash)) {
+        setActiveTab(hash);
+        return;
+      }
+      const stored = localStorage.getItem('halallens_admin_active_tab') as NavTab;
+      if (VALID_TABS.includes(stored)) {
+        setActiveTab(stored);
+        window.history.replaceState(null, '', `#${stored}`);
+      }
+    };
+
+    syncTab();
+
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') as NavTab;
+      if (VALID_TABS.includes(hash)) {
+        setActiveTab(hash);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const handleTabChange = (tab: NavTab) => {
+    setActiveTab(tab);
+    setSearchQuery('');
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('halallens_admin_active_tab', tab);
+        window.history.replaceState(null, '', `#${tab}`);
+      } catch (_) {}
+    }
+  };
 
   // Initialize data and real Supabase Auth session on mount
   useEffect(() => {
@@ -63,7 +121,7 @@ export default function AdminDashboardPage() {
           setCurrentUser(user);
         }
 
-        const [prods, adds, usrs, adList, logList, admob, groq] = await Promise.all([
+        const [prods, adds, usrs, adList, logList, admob, groq, authSet] = await Promise.all([
           fetchProducts(),
           fetchAdditives(),
           fetchUsers(),
@@ -71,6 +129,7 @@ export default function AdminDashboardPage() {
           fetchLogs(),
           fetchAdMobSettings(),
           fetchGroqSettings(),
+          fetchAuthSettings(),
         ]);
         if (isMounted) {
           setProducts(prods);
@@ -80,6 +139,7 @@ export default function AdminDashboardPage() {
           setLogs(logList);
           setAdmobSettings(admob);
           setGroqSettings(groq);
+          setAuthSettings(authSet);
         }
       } catch (err) {
         console.error('Error loading Supabase data:', err);
@@ -162,6 +222,11 @@ export default function AdminDashboardPage() {
     setGroqSettings(updated);
   };
 
+  const handleSaveAuthSettings = async (newSettings: AuthSettings) => {
+    const updated = await saveAuthSettings(newSettings, currentUser?.name || 'Admin');
+    setAuthSettings(updated);
+  };
+
   const handleLogout = async () => {
     await logoutAdmin();
     setCurrentUser(null);
@@ -196,10 +261,7 @@ export default function AdminDashboardPage() {
       {/* Fixed Sticky Left Sidebar: NEVER scrolls with page */}
       <Sidebar
         activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab);
-          setSearchQuery('');
-        }}
+        onTabChange={handleTabChange}
         counts={counts}
       />
 
@@ -224,10 +286,7 @@ export default function AdminDashboardPage() {
                 ads={ads}
                 logs={logs}
                 currentUser={currentUser}
-                onNavigateTab={(tab) => {
-                  setActiveTab(tab);
-                  setSearchQuery('');
-                }}
+                onNavigateTab={handleTabChange}
                 onQuickVerify={handleQuickVerify}
               />
             )}
@@ -255,6 +314,9 @@ export default function AdminDashboardPage() {
                 onToggleBan={handleToggleBan}
                 onTogglePremium={handleTogglePremium}
                 searchQuery={searchQuery}
+                authSettings={authSettings}
+                onSaveAuthSettings={handleSaveAuthSettings}
+                currentAdminName={currentUser?.name}
               />
             )}
 
@@ -287,6 +349,7 @@ export default function AdminDashboardPage() {
                 products={products}
                 users={users}
                 additives={additives}
+                logs={logs}
               />
             )}
 
@@ -304,6 +367,8 @@ export default function AdminDashboardPage() {
           </div>
         </main>
       </div>
+
+      <ToastContainer />
     </div>
   );
 }

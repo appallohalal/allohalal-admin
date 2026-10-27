@@ -69,10 +69,13 @@ CREATE INDEX IF NOT EXISTS idx_additives_status ON public.additives(status);
 -- 5. User Management & Scan Tracking
 CREATE TABLE IF NOT EXISTS public.users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  device_id VARCHAR(128) UNIQUE NOT NULL,
+  device_id VARCHAR(128),
   email VARCHAR(255) UNIQUE,
   name VARCHAR(255),
+  username VARCHAR(128),
   country VARCHAR(64) DEFAULT 'Unknown',
+  city VARCHAR(128) DEFAULT '',
+  password_hash TEXT,
   is_premium BOOLEAN DEFAULT FALSE,
   is_banned BOOLEAN DEFAULT FALSE,
   ban_reason TEXT,
@@ -82,6 +85,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_device ON public.users(device_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 
 -- 6. Geo-Targeted Ads & Partnerships (PostGIS)
 CREATE TABLE IF NOT EXISTS public.geo_ads (
@@ -414,5 +418,26 @@ CREATE POLICY "Allow all for groq_settings" ON public.groq_settings FOR ALL USIN
 INSERT INTO public.groq_settings (id, api_key, model, vision_model, is_enabled)
 VALUES ('global', '', 'llama-3.3-70b-versatile', 'llama-3.2-11b-vision-preview', true)
 ON CONFLICT (id) DO NOTHING;
+
+-- ==============================================================================
+-- 13. Mobile App Authentication Remote Configuration (Feature Toggle)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.auth_settings (
+  id VARCHAR(64) PRIMARY KEY DEFAULT 'global',
+  force_user_auth BOOLEAN DEFAULT FALSE,
+  allow_guest_scan BOOLEAN DEFAULT TRUE,
+  require_email_verification BOOLEAN DEFAULT FALSE,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by VARCHAR(128) DEFAULT 'Admin'
+);
+
+ALTER TABLE public.auth_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for auth_settings" ON public.auth_settings;
+CREATE POLICY "Allow all for auth_settings" ON public.auth_settings FOR ALL USING (true) WITH CHECK (true);
+
+INSERT INTO public.auth_settings (id, force_user_auth, allow_guest_scan)
+VALUES ('global', false, true)
+ON CONFLICT (id) DO NOTHING;
+
 
 
