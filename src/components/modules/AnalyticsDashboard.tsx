@@ -180,7 +180,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         <div className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-500">Total Scans</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+            <div className="w-8 h-8 rounded-xl bg-[#e6f4eb] text-[#088839] flex items-center justify-center border border-[#ccebd7]">
               <ScanLine className="w-4 h-4" />
             </div>
           </div>
@@ -188,7 +188,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             {totalScans.toLocaleString()}
           </div>
           <div className="text-[11px] text-slate-500 font-medium mt-1">
-            <span className="font-semibold text-blue-700">{totalLogsCount}</span> AI inference traces
+            <span className="font-semibold text-[#066d2e]">{totalLogsCount}</span> AI inference traces
           </div>
         </div>
 
@@ -320,9 +320,9 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             >
               <defs>
                 <linearGradient id="realAnalyticsAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#2563eb" stopOpacity="0.22" />
-                  <stop offset="85%" stopColor="#2563eb" stopOpacity="0.02" />
-                  <stop offset="100%" stopColor="#2563eb" stopOpacity="0.00" />
+                  <stop offset="0%" stopColor="#088839" stopOpacity="0.22" />
+                  <stop offset="85%" stopColor="#088839" stopOpacity="0.02" />
+                  <stop offset="100%" stopColor="#088839" stopOpacity="0.00" />
                 </linearGradient>
               </defs>
 
@@ -340,7 +340,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 <path
                   d={linePath}
                   fill="none"
-                  stroke="#2563eb"
+                  stroke="#088839"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -371,8 +371,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     cx={pt.x}
                     cy={pt.y}
                     r={hoveredPointIndex === idx ? 6 : 4}
-                    fill={hoveredPointIndex === idx ? '#2563eb' : '#ffffff'}
-                    stroke="#2563eb"
+                    fill={hoveredPointIndex === idx ? '#088839' : '#ffffff'}
+                    stroke="#088839"
                     strokeWidth={hoveredPointIndex === idx ? 2.5 : 2}
                     className="transition-all duration-150"
                   />
@@ -381,7 +381,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                       cx={pt.x}
                       cy={pt.y}
                       r="12"
-                      fill="#2563eb"
+                      fill="#088839"
                       fillOpacity="0.15"
                     />
                   )}
@@ -398,7 +398,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                   onClick={() => setHoveredPointIndex(i)}
                   className={`transition-colors cursor-pointer ${
                     hoveredPointIndex === i
-                      ? 'text-blue-700 font-bold'
+                      ? 'text-[#066d2e] font-bold'
                       : 'hover:text-slate-700'
                   }`}
                 >

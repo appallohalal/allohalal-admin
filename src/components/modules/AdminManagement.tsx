@@ -200,8 +200,8 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
         );
       case 'System Admin':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
-            <Shield className="w-3 h-3 text-blue-600" />
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-[#b5e0c5]">
+            <Shield className="w-3 h-3 text-[#088839]" />
             System Admin
           </span>
         );

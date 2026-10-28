@@ -63,3 +63,39 @@ export async function GET(req: NextRequest) {
     ads: matchingAds,
   });
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { adId, event } = body;
+
+    if (!adId || !['impression', 'click'].includes(event)) {
+      return NextResponse.json(
+        { success: false, error: 'adId and valid event (impression | click) are required' },
+        { status: 400 }
+      );
+    }
+
+    const { data: current } = await supabase
+      .from('geo_ads')
+      .select('impression_count, click_count')
+      .eq('id', adId)
+      .maybeSingle();
+
+    if (current) {
+      const updates =
+        event === 'impression'
+          ? { impression_count: (current.impression_count || 0) + 1 }
+          : { click_count: (current.click_count || 0) + 1 };
+
+      await supabase.from('geo_ads').update(updates).eq('id', adId);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { GeoAd } from '@/lib/types';
+import { APP_COLORS } from '@/lib/colors';
+import { toast } from '@/lib/toast';
 import {
   MapPin,
   Plus,
@@ -10,40 +12,51 @@ import {
   Eye,
   MousePointerClick,
   Percent,
-  Sliders,
   Check,
   X,
   Edit2,
   Trash2,
-  Power,
-  Globe,
+  Navigation,
+  ArrowUpRight,
+  Image as ImageIcon,
+  Link2,
+  Building2,
+  Type,
+  Radio,
 } from 'lucide-react';
 
 interface GeoAdsProps {
   ads: GeoAd[];
   onSaveAd: (ad: GeoAd) => void;
   onToggleActive: (adId: string) => void;
+  onDeleteAd?: (adId: string) => void;
   searchQuery: string;
 }
 
 const CITY_PRESETS = [
-  { name: 'London, UK', lat: 51.5074, lng: -0.1278 },
   { name: 'Dhaka, BD', lat: 23.8103, lng: 90.4125 },
+  { name: 'London, UK', lat: 51.5074, lng: -0.1278 },
   { name: 'Dubai, UAE', lat: 25.2048, lng: 55.2708 },
+  { name: 'Paris, FR', lat: 48.8566, lng: 2.3522 },
   { name: 'New York, USA', lat: 40.7128, lng: -74.0060 },
   { name: 'Istanbul, TR', lat: 41.0082, lng: 28.9784 },
   { name: 'Kuala Lumpur, MY', lat: 3.1390, lng: 101.6869 },
-  { name: 'Paris, FR', lat: 48.8566, lng: 2.3522 },
 ];
+
+const RADIUS_PRESETS = [15, 50, 100];
 
 export const GeoAds: React.FC<GeoAdsProps> = ({
   ads,
   onSaveAd,
   onToggleActive,
+  onDeleteAd,
   searchQuery,
 }) => {
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAd, setEditingAd] = useState<GeoAd | null>(null);
+  const [deleteConfirmAd, setDeleteConfirmAd] = useState<GeoAd | null>(null);
+  const [isLocating, setIsLocating] = useState(false);
 
   // Form State
   const [title, setTitle] = useState('');
@@ -52,19 +65,22 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
   const [targetUrl, setTargetUrl] = useState('');
   const [latitude, setLatitude] = useState(23.8103);
   const [longitude, setLongitude] = useState(90.4125);
-  const [radiusKm, setRadiusKm] = useState(15.0);
-  const [locationName, setLocationName] = useState('Dhaka Metropolitan Area');
+  const [radiusKm, setRadiusKm] = useState(15);
+  const [locationName, setLocationName] = useState('Dhaka, BD');
+
+  const c = APP_COLORS.classes;
+  const inputCls = `w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`;
 
   const openNewModal = () => {
     setEditingAd(null);
-    setTitle('Al-Amin Halal Butchers & Grocers');
-    setSponsorName('Al-Amin Foods');
-    setBannerImageUrl('https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80');
-    setTargetUrl('https://example.com/halal-discount');
+    setTitle('');
+    setSponsorName('');
+    setBannerImageUrl('');
+    setTargetUrl('');
     setLatitude(23.8103);
     setLongitude(90.4125);
-    setRadiusKm(15.0);
-    setLocationName('Dhaka, Bangladesh');
+    setRadiusKm(15);
+    setLocationName('Dhaka, BD');
     setIsModalOpen(true);
   };
 
@@ -87,6 +103,27 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
     setLocationName(preset.name);
   };
 
+  const handleUseCurrentGps = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser.', 'GPS Unavailable');
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLatitude(Number(pos.coords.latitude.toFixed(4)));
+        setLongitude(Number(pos.coords.longitude.toFixed(4)));
+        setIsLocating(false);
+        toast.success('GPS coordinates updated from your current location.', 'Location Detected');
+      },
+      (err) => {
+        setIsLocating(false);
+        toast.error(err.message || 'Unable to retrieve your location.', 'GPS Error');
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const newAd: GeoAd = {
@@ -98,7 +135,7 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
       latitude: Number(latitude),
       longitude: Number(longitude),
       radiusKm: Number(radiusKm),
-      locationName: locationName.trim(),
+      locationName: locationName.trim() || 'Local Area',
       isActive: editingAd ? editingAd.isActive : true,
       impressionCount: editingAd ? editingAd.impressionCount : 0,
       clickCount: editingAd ? editingAd.clickCount : 0,
@@ -106,360 +143,709 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
     };
 
     onSaveAd(newAd);
+    toast.success(
+      editingAd
+        ? `Campaign "${newAd.title}" updated successfully.`
+        : `Campaign "${newAd.title}" created and live.`,
+      editingAd ? 'Campaign Updated' : 'Campaign Created'
+    );
     setIsModalOpen(false);
   };
 
-  const filtered = ads.filter((a) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      a.title.toLowerCase().includes(q) ||
-      a.sponsorName.toLowerCase().includes(q) ||
-      a.locationName.toLowerCase().includes(q)
+  const handleToggle = (ad: GeoAd) => {
+    onToggleActive(ad.id);
+    toast.success(
+      ad.isActive
+        ? `"${ad.title}" has been paused.`
+        : `"${ad.title}" is now active in the mobile app.`,
+      ad.isActive ? 'Campaign Paused' : 'Campaign Activated'
     );
-  });
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmAd || !onDeleteAd) return;
+    onDeleteAd(deleteConfirmAd.id);
+    toast.success(`Campaign "${deleteConfirmAd.title}" deleted.`, 'Campaign Deleted');
+    setDeleteConfirmAd(null);
+  };
+
+  // Summary Stats
+  const stats = useMemo(() => {
+    const total = ads.length;
+    const active = ads.filter((a) => a.isActive).length;
+    const impressions = ads.reduce((sum, a) => sum + (a.impressionCount || 0), 0);
+    const clicks = ads.reduce((sum, a) => sum + (a.clickCount || 0), 0);
+    const avgCtr = impressions > 0 ? ((clicks / impressions) * 100).toFixed(1) : '0.0';
+    return { total, active, impressions, clicks, avgCtr };
+  }, [ads]);
+
+  // Filtered Ads
+  const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    return ads.filter((a) => {
+      if (statusFilter === 'ACTIVE' && !a.isActive) return false;
+      if (statusFilter === 'PAUSED' && a.isActive) return false;
+      if (!q) return true;
+      return (
+        a.title.toLowerCase().includes(q) ||
+        a.sponsorName.toLowerCase().includes(q) ||
+        a.locationName.toLowerCase().includes(q)
+      );
+    });
+  }, [ads, statusFilter, searchQuery]);
 
   return (
-    <div className="space-y-6">
-      {/* Top Header & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center">
-            <Compass className="w-5 h-5 text-blue-600" />
+    <div className="space-y-6 pb-16">
+      {/* 1. Top Header Banner */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-xs ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder}`}
+          >
+            <Compass className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              Geo-Targeted Ads & Local Partnerships
-              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                PostGIS Ready
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                Geo-Targeted Ads
+              </h2>
+              <span
+                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  stats.active > 0
+                    ? `${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}
+              >
+                {stats.active} Active
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-medium">
-              Serve local halal grocery, butcher, and restaurant promotions based on mobile user GPS latitude, longitude, and radius.
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">
+              Broadcast local halal promotions to mobile users within your target GPS radius
             </p>
           </div>
         </div>
 
         <button
+          type="button"
           onClick={openNewModal}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition-all hover:scale-105"
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-2 transition-all cursor-pointer active:scale-98 ${c.primaryBg} ${c.primaryBgHover}`}
         >
           <Plus className="w-4 h-4" />
-          Create Geo Ad Campaign
+          <span>New Campaign</span>
         </button>
       </div>
 
-      {/* Ads Grid */}
+      {/* 2. KPI Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-500">Total Campaigns</p>
+            <p className="text-xl font-bold text-slate-900 mt-1">{stats.total}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600">
+            <Compass className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-500">Active Banners</p>
+            <p className="text-xl font-bold text-[#088839] mt-1">{stats.active}</p>
+          </div>
+          <div
+            className={`w-10 h-10 rounded-xl border flex items-center justify-center ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder}`}
+          >
+            <Radio className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-500">Total Impressions</p>
+            <p className="text-xl font-bold text-slate-900 mt-1">
+              {stats.impressions.toLocaleString()}
+            </p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-600">
+            <Eye className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-[11px] font-semibold text-slate-500">Total Clicks (CTR)</p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <p className="text-xl font-bold text-slate-900">{stats.clicks.toLocaleString()}</p>
+              <span className="text-xs font-bold text-emerald-600">({stats.avgCtr}%)</span>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600">
+            <MousePointerClick className="w-5 h-5" />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Filter Pills */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="inline-flex items-center gap-1.5 bg-white border border-slate-200 p-1 rounded-xl shadow-2xs">
+          {(
+            [
+              { id: 'ALL', label: `All (${ads.length})` },
+              { id: 'ACTIVE', label: `Active (${stats.active})` },
+              { id: 'PAUSED', label: `Paused (${ads.length - stats.active})` },
+            ] as const
+          ).map((tab) => {
+            const active = statusFilter === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setStatusFilter(tab.id)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  active
+                    ? `${c.primaryBg} text-white shadow-2xs`
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. Campaigns Grid */}
       {filtered.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center text-slate-400">
-          <MapPin className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm font-semibold text-slate-700">No active geo-targeted ad campaigns</p>
-          <p className="text-xs text-slate-400 mt-1">
-            Click "Create Geo Ad Campaign" to target local mobile users within a kilometer radius.
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-xs">
+          <div
+            className={`w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center border ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder}`}
+          >
+            <MapPin className="w-6 h-6" />
+          </div>
+          <p className="text-sm font-bold text-slate-900">No geo-targeted campaigns found</p>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            Create a campaign with target GPS coordinates and a broadcast radius to display local
+            partner banners in the mobile app.
           </p>
+          <button
+            type="button"
+            onClick={openNewModal}
+            className={`mt-4 px-4 py-2 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5 cursor-pointer ${c.primaryBg} ${c.primaryBgHover}`}
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create First Campaign</span>
+          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {filtered.map((ad) => {
-            const ctr = ad.impressionCount > 0 ? ((ad.clickCount / ad.impressionCount) * 100).toFixed(1) : '0.0';
+            const ctr =
+              ad.impressionCount > 0
+                ? ((ad.clickCount / ad.impressionCount) * 100).toFixed(1)
+                : '0.0';
 
             return (
               <div
-              key={ad.id}
-              className={`bg-white border rounded-2xl overflow-hidden shadow-xs transition-all ${
-                ad.isActive
-                  ? 'border-slate-200 hover:border-slate-300 hover:shadow-md'
-                  : 'border-slate-200/60 opacity-60'
-              }`}
-            >
-              {/* Banner Image Preview */}
-              <div className="relative h-44 w-full bg-slate-100 overflow-hidden">
-                <img
-                  src={ad.bannerImageUrl}
-                  alt={ad.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-
-                {/* Status chip */}
-                <div className="absolute top-3 right-3 flex items-center gap-2">
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-xs font-bold border backdrop-blur-md ${
-                      ad.isActive
-                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-sm'
-                        : 'bg-slate-800 text-slate-300 border-slate-700'
-                    }`}
-                  >
-                    {ad.isActive ? '● Active' : '○ Inactive'}
-                  </span>
-                </div>
-
-                {/* Location Badge */}
-                <div className="absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/95 border border-slate-200/80 backdrop-blur-sm text-xs font-bold text-slate-800 shadow-xs">
-                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
-                  <span>{ad.locationName}</span>
-                  <span className="text-slate-500 font-medium">• Radius: {ad.radiusKm} km</span>
-                </div>
-              </div>
-
-              {/* Ad Info & Metrics */}
-              <div className="p-5 space-y-4">
+                key={ad.id}
+                className={`group bg-white border rounded-2xl overflow-hidden shadow-xs transition-all flex flex-col justify-between ${
+                  ad.isActive
+                    ? 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+                    : 'border-slate-200/70 opacity-75'
+                }`}
+              >
                 <div>
-                  <div className="text-xs font-bold text-blue-700 uppercase tracking-wider">
-                    {ad.sponsorName}
+                  {/* Mobile-Style Banner Preview */}
+                  <div className="relative h-44 w-full bg-slate-900 overflow-hidden">
+                    <img
+                      src={ad.bannerImageUrl}
+                      alt={ad.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                    {/* Multi-stop gradient scrim matching Flutter GeoAdBannerWidget */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/25" />
+
+                    {/* Top Bar: Featured Partner & Radius Pill */}
+                    <div className="absolute top-3.5 inset-x-3.5 flex items-center justify-between gap-2">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            ad.isActive
+                              ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)]'
+                              : 'bg-slate-400'
+                          }`}
+                        />
+                        <span className="text-[10px] font-extrabold text-white tracking-wider uppercase">
+                          Featured Partner
+                        </span>
+                      </div>
+
+                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md text-[11px] font-bold text-white">
+                        <MapPin className="w-3 h-3 text-blue-400" />
+                        <span>{ad.radiusKm} km radius</span>
+                      </div>
+                    </div>
+
+                    {/* Bottom Overlay: Sponsor, Headline & Visit Pill */}
+                    <div className="absolute bottom-3.5 inset-x-3.5 flex items-end justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] font-extrabold text-blue-300 uppercase tracking-wider truncate">
+                          {ad.sponsorName}
+                        </div>
+                        <h4 className="text-sm font-extrabold text-white leading-snug line-clamp-2 mt-0.5 drop-shadow-xs">
+                          {ad.title}
+                        </h4>
+                      </div>
+
+                      <a
+                        href={ad.targetUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 border border-white/30 backdrop-blur-md text-[11px] font-bold text-white transition-colors"
+                      >
+                        <span>Visit</span>
+                        <ArrowUpRight className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </div>
-                  <h4 className="text-base font-bold text-slate-900 mt-0.5">{ad.title}</h4>
-                  <a
-                    href={ad.targetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 font-medium mt-1 transition-colors"
-                  >
-                    <ExternalLink className="w-3 h-3" /> {ad.targetUrl}
-                  </a>
+
+                  {/* Card Details */}
+                  <div className="p-5 space-y-4">
+                    {/* Location & Target URL Info */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-700 font-semibold">
+                        <MapPin className="w-3.5 h-3.5 text-[#088839] shrink-0" />
+                        <span>{ad.locationName}</span>
+                        <span className="text-slate-400 font-mono text-[11px]">
+                          ({ad.latitude.toFixed(4)}, {ad.longitude.toFixed(4)})
+                        </span>
+                      </div>
+
+                      <a
+                        href={ad.targetUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-[#088839] font-medium truncate max-w-[200px] transition-colors"
+                        title={ad.targetUrl}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{ad.targetUrl.replace(/^https?:\/\//, '')}</span>
+                      </a>
+                    </div>
+
+                    {/* Metrics Strip */}
+                    <div className="grid grid-cols-3 gap-2 py-3 px-2 rounded-xl bg-slate-50/70 border border-slate-200/70 text-center">
+                      <div>
+                        <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 font-semibold">
+                          <Eye className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Impressions</span>
+                        </div>
+                        <div className="text-sm font-bold text-slate-900 mt-0.5">
+                          {ad.impressionCount.toLocaleString()}
+                        </div>
+                      </div>
+
+                      <div className="border-x border-slate-200/70">
+                        <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 font-semibold">
+                          <MousePointerClick className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Clicks</span>
+                        </div>
+                        <div className="text-sm font-bold text-slate-900 mt-0.5">
+                          {ad.clickCount.toLocaleString()}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 font-semibold">
+                          <Percent className="w-3.5 h-3.5 text-slate-400" />
+                          <span>CTR</span>
+                        </div>
+                        <div className="text-sm font-bold text-emerald-600 mt-0.5">{ctr}%</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* GPS Coordinates & PostGIS specs */}
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                  <span className="font-mono text-slate-600 font-medium">
-                    GPS: {ad.latitude.toFixed(4)}, {ad.longitude.toFixed(4)}
-                  </span>
-                  <span className="font-mono text-emerald-700 font-bold">
-                    ST_DWithin ({ad.radiusKm}km)
-                  </span>
-                </div>
-
-                {/* Analytics Counters */}
-                <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 text-center">
-                  <div>
-                    <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 font-medium">
-                      <Eye className="w-3 h-3" /> Impressions
-                    </div>
-                    <div className="text-sm font-bold text-slate-900 mt-0.5">
-                      {ad.impressionCount.toLocaleString()}
-                    </div>
+                {/* Card Footer: Status Toggle & Edit/Delete */}
+                <div className="px-5 py-3.5 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={ad.isActive}
+                      onClick={() => handleToggle(ad)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        ad.isActive ? c.primaryBg : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition duration-200 ease-in-out ${
+                          ad.isActive ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span
+                      className={`text-xs font-bold ${
+                        ad.isActive ? 'text-slate-800' : 'text-slate-400'
+                      }`}
+                    >
+                      {ad.isActive ? 'Active' : 'Paused'}
+                    </span>
                   </div>
-                  <div>
-                    <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 font-medium">
-                      <MousePointerClick className="w-3 h-3" /> Clicks
-                    </div>
-                    <div className="text-sm font-bold text-slate-900 mt-0.5">
-                      {ad.clickCount.toLocaleString()}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-center gap-1 text-[11px] text-slate-500 font-medium">
-                      <Percent className="w-3 h-3" /> CTR
-                    </div>
-                    <div className="text-sm font-bold text-emerald-700 mt-0.5">{ctr}%</div>
-                  </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    onClick={() => onToggleActive(ad.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                      ad.isActive
-                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
-                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                    }`}
-                  >
-                    <Power className="w-3.5 h-3.5" />
-                    {ad.isActive ? 'Pause Banner' : 'Activate Banner'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(ad)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
 
-                  <button
-                    onClick={() => openEditModal(ad)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" /> Edit
-                  </button>
+                    {onDeleteAd && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteConfirmAd(ad)}
+                        className="inline-flex items-center justify-center p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-colors cursor-pointer"
+                        title="Delete campaign"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
             );
           })}
         </div>
       )}
 
-      {/* CREATE / EDIT GEO AD MODAL */}
+      {/* 5. Create / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150 my-6">
-            <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 my-6">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200">
-                  <Compass className="w-5 h-5 text-blue-600" />
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center border ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder}`}
+                >
+                  <Compass className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    {editingAd ? 'Edit Geo-Targeted Campaign' : 'Create New Geo-Targeted Ad'}
+                    {editingAd ? 'Edit Geo Ad Campaign' : 'New Geo Ad Campaign'}
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    Configure sponsor details, banner graphic, GPS coordinates, and broadcast radius.
+                    Set sponsor details, target GPS coordinates, and broadcast radius
                   </p>
                 </div>
               </div>
+
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Campaign Title</label>
+            {/* Live Mobile App Banner Preview */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                <span>Live Mobile Banner Preview</span>
+                <span className="text-[#088839]">{radiusKm} km Broadcast Zone</span>
+              </div>
+              <div className="relative h-36 w-full rounded-2xl bg-slate-900 overflow-hidden border border-slate-200 shadow-xs">
+                {bannerImageUrl ? (
+                  <img
+                    src={bannerImageUrl}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : null}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/25" />
+
+                <div className="absolute top-3 inset-x-3 flex items-center justify-between">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    <span className="text-[10px] font-extrabold text-white uppercase tracking-wider">
+                      Featured Partner
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md text-[10px] font-bold text-white">
+                    <MapPin className="w-3 h-3 text-blue-400" />
+                    <span>{locationName || 'Target Area'}</span>
+                  </div>
+                </div>
+
+                <div className="absolute bottom-3 inset-x-3 flex items-end justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-extrabold text-blue-300 uppercase tracking-wider truncate">
+                      {sponsorName || 'Sponsor Name'}
+                    </div>
+                    <div className="text-sm font-extrabold text-white truncate mt-0.5">
+                      {title || 'Campaign Headline'}
+                    </div>
+                  </div>
+                  <div className="shrink-0 inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/20 border border-white/30 backdrop-blur-md text-[11px] font-bold text-white">
+                    <span>Visit</span>
+                    <ArrowUpRight className="w-3 h-3" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Sponsor & Creative Inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                    <Type className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Campaign Title</span>
+                  </label>
                   <input
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. 15% OFF Certified Halal Meat"
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="e.g. 20% OFF Certified Halal Meat"
+                    className={inputCls}
                     required
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-700">Sponsor / Business Name</label>
+                <div>
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Sponsor / Business Name</span>
+                  </label>
                   <input
                     type="text"
                     value={sponsorName}
                     onChange={(e) => setSponsorName(e.target.value)}
-                    placeholder="e.g. Medina Gourmet Butcher"
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="e.g. Al-Amin Halal Mart"
+                    className={inputCls}
                     required
                   />
                 </div>
 
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">Banner Image URL</label>
+                <div>
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Banner Image URL</span>
+                  </label>
                   <input
                     type="url"
                     value={bannerImageUrl}
                     onChange={(e) => setBannerImageUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="https://images.unsplash.com/..."
+                    className={inputCls}
                     required
                   />
                 </div>
 
-                <div className="space-y-1 md:col-span-2">
-                  <label className="text-xs font-bold text-slate-700">Redirect Link (Target URL)</label>
+                <div>
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                    <Link2 className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Target Redirect URL</span>
+                  </label>
                   <input
                     type="url"
                     value={targetUrl}
                     onChange={(e) => setTargetUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="https://example.com/offer"
+                    className={inputCls}
                     required
                   />
                 </div>
               </div>
 
-              {/* Geo Location & PostGIS Radius Section */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700">
-                    <MapPin className="w-4 h-4 text-blue-600" /> GPS Target Coordinates & Radius
+              {/* GPS Coordinates & Radius Box */}
+              <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                    <MapPin className="w-4 h-4 text-[#088839]" />
+                    <span>Target GPS Coordinates & Broadcast Radius</span>
                   </div>
-                  <span className="text-[11px] text-slate-500 font-medium">Select city preset or type lat/lng</span>
+
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentGps}
+                    disabled={isLocating}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#e6f4eb] hover:bg-blue-100 text-[#066d2e] border border-[#b5e0c5] text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Navigation className="w-3 h-3" />
+                    <span>{isLocating ? 'Detecting GPS...' : 'Use My Current GPS'}</span>
+                  </button>
                 </div>
 
-                {/* City Preset Buttons */}
+                {/* City Presets */}
                 <div className="flex flex-wrap gap-1.5">
-                  {CITY_PRESETS.map((city) => (
-                    <button
-                      key={city.name}
-                      type="button"
-                      onClick={() => handlePresetSelect(city)}
-                      className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-colors"
-                    >
-                      {city.name}
-                    </button>
-                  ))}
+                  {CITY_PRESETS.map((city) => {
+                    const isSelected = locationName === city.name;
+                    return (
+                      <button
+                        key={city.name}
+                        type="button"
+                        onClick={() => handlePresetSelect(city)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                          isSelected
+                            ? `${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`
+                            : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        {city.name}
+                      </button>
+                    );
+                  })}
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-600">Target Region Name</label>
+                {/* Location Name, Lat, Lng */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      City / Area Label
+                    </label>
                     <input
                       type="text"
                       value={locationName}
                       onChange={(e) => setLocationName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-900"
+                      placeholder="e.g. Dhaka, BD"
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-900 focus:outline-none focus:border-[#088839]"
                       required
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-600">Latitude (GPS)</label>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      Latitude
+                    </label>
                     <input
                       type="number"
                       step="0.0001"
                       value={latitude}
-                      onChange={(e) => setLatitude(parseFloat(e.target.value))}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-mono font-medium text-slate-900"
+                      onChange={(e) => setLatitude(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-slate-900 focus:outline-none focus:border-[#088839]"
                       required
                     />
                   </div>
 
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-slate-600">Longitude (GPS)</label>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      Longitude
+                    </label>
                     <input
                       type="number"
                       step="0.0001"
                       value={longitude}
-                      onChange={(e) => setLongitude(parseFloat(e.target.value))}
-                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-mono font-medium text-slate-900"
+                      onChange={(e) => setLongitude(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono font-semibold text-slate-900 focus:outline-none focus:border-[#088839]"
                       required
                     />
                   </div>
                 </div>
 
-                {/* Radius Slider */}
-                <div className="space-y-1.5 pt-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-700 font-bold">Broadcast Radius:</span>
-                    <span className="font-bold text-blue-700">{radiusKm} Kilometers</span>
+                {/* Broadcast Radius Slider */}
+                <div className="pt-1 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Broadcast Radius</span>
+                    <div className="flex items-center gap-1.5">
+                      {RADIUS_PRESETS.map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setRadiusKm(r)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                            radiusKm === r
+                              ? `${c.primaryBg} text-white border-[#088839] shadow-2xs`
+                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {r} km
+                        </button>
+                      ))}
+                      <span className="ml-1 px-2.5 py-1 rounded-lg bg-[#e6f4eb] border border-[#b5e0c5] text-xs font-extrabold text-[#066d2e]">
+                        {radiusKm} km
+                      </span>
+                    </div>
                   </div>
+
                   <input
                     type="range"
                     min="1"
-                    max="100"
+                    max="150"
                     step="1"
                     value={radiusKm}
                     onChange={(e) => setRadiusKm(parseFloat(e.target.value))}
-                    className="w-full accent-blue-600 cursor-pointer"
+                    className="w-full accent-[#088839] cursor-pointer"
                   />
-                  <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-                    <span>1 km (Hyperlocal neighborhood)</span>
-                    <span>50 km (City wide)</span>
-                    <span>100 km (Regional)</span>
+
+                  <div className="flex justify-between text-[10px] text-slate-400 font-semibold">
+                    <span>15 km (Local Area)</span>
+                    <span>50 km (City-Wide)</span>
+                    <span>100+ km (Regional)</span>
                   </div>
                 </div>
               </div>
 
-              {/* Form Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              {/* Modal Actions */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200"
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center gap-1.5"
+                  className={`px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-98 ${c.primaryBg} ${c.primaryBgHover}`}
                 >
                   <Check className="w-4 h-4" />
-                  Save Campaign
+                  <span>{editingAd ? 'Save Changes' : 'Create Campaign'}</span>
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Delete Confirmation Modal */}
+      {deleteConfirmAd && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Delete Campaign?</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Are you sure you want to delete{' '}
+                  <span className="font-bold text-slate-700">"{deleteConfirmAd.title}"</span>?
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmAd(null)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 cursor-pointer"
+              >
+                Delete Campaign
+              </button>
+            </div>
           </div>
         </div>
       )}

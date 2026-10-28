@@ -26,6 +26,10 @@ const TAB_TITLES: Record<NavTab, { title: string; desc: string }> = {
     title: 'Additives',
     desc: 'E-numbers dictionary',
   },
+  notifications: {
+    title: 'Push Notifications',
+    desc: 'Send push notifications to mobile devices',
+  },
   users: {
     title: 'Users',
     desc: 'App accounts and devices',
@@ -79,14 +83,14 @@ export const Header: React.FC<HeaderProps> = ({
             placeholder="Search items, codes..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#088839] focus:bg-white transition-colors"
           />
         </div>
 
         {/* User profile */}
         <div className="flex items-center gap-2.5 pl-3 border-l border-slate-200">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white text-xs font-bold shadow-xs">
-            {currentUser?.avatarInitials || 'AI'}
+          <div className="w-8 h-8 rounded-full bg-[#088839] flex items-center justify-center text-white text-xs font-bold shadow-xs">
+            {currentUser?.avatarInitials || 'AH'}
           </div>
           <div className="text-left hidden lg:block">
             <div className="text-xs font-bold text-slate-900">
@@ -101,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onLogout && (
             <button
               onClick={() => {
-                if (confirm('Log out from HalalLens Admin?')) {
+                if (confirm('Log out from Allo Halal Admin?')) {
                   onLogout();
                 }
               }}

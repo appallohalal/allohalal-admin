@@ -92,8 +92,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
   if (isFirstUser === null) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-emerald-600">
-          <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center gap-3 text-[#088839]">
+          <div className="w-5 h-5 border-2 border-[#088839] border-t-transparent rounded-full animate-spin" />
           <span className="text-sm font-semibold text-slate-700">Loading...</span>
         </div>
       </div>
@@ -105,12 +105,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl shadow-xl p-8 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 items-center justify-center shadow-lg shadow-emerald-600/20 mb-1">
-            {isFirstUser ? (
-              <Crown className="w-8 h-8 text-white" />
-            ) : (
-              <ShieldCheck className="w-8 h-8 text-white" />
-            )}
+          <div className="inline-flex w-16 h-16 rounded-2xl overflow-hidden bg-[#088839] items-center justify-center shadow-lg shadow-[#088839]/25 mb-1">
+            <img src="/logo.png" alt="Allo Halal" className="w-full h-full object-cover" />
           </div>
 
           {isFirstUser ? (
@@ -125,7 +121,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
             </>
           ) : (
             <>
-              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">HalalLens Admin</h2>
+              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Allo Halal Admin</h2>
               <p className="text-xs text-slate-500 font-medium">
                 Sign in to access AI Moderation & Certification Management
               </p>
@@ -203,7 +199,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-xl bg-[#088839] hover:bg-[#066d2e] text-white text-xs font-bold shadow-md shadow-[#088839]/20 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 cursor-pointer"
           >
             {isLoading ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

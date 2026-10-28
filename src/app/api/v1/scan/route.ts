@@ -19,6 +19,17 @@ export async function POST(req: NextRequest) {
 
     if (!error && product) {
       const finalStatus = product.manual_status || product.ai_status;
+
+      // Increment scan counter in background
+      supabase
+        .from('products')
+        .update({
+          scans_count: (product.scans_count || 0) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', product.id)
+        .then(() => {});
+
       return NextResponse.json({
         found: true,
         source: product.is_overridden ? 'MODERATOR_OVERRIDE' : 'SUPABASE_CACHE',
@@ -26,6 +37,7 @@ export async function POST(req: NextRequest) {
           barcode: product.barcode,
           name: product.name,
           brand: product.brand,
+          imageUrl: product.image_url,
           status: finalStatus,
           isOverridden: product.is_overridden,
           moderatorNote: product.moderator_note,

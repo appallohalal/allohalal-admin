@@ -3,10 +3,10 @@
  * Synchronized directly with the mobile client AppTheme (scanner/lib/theme/app_theme.dart)
  */
 export const APP_COLORS = {
-  // Primary Brand Color: 0xFF2563EB (Tailwind blue-600)
-  primary: '#2563EB',
-  primaryDark: '#1D4ED8',
-  primaryLight: '#DBEAFE',
+  // Primary Brand Color: #088839 (Allo Halal Official Logo Green)
+  primary: '#088839',
+  primaryDark: '#066D2E',
+  primaryLight: '#E6F4EB',
 
   // Status Compliance Colors
   halal: '#2E7D32',
@@ -18,16 +18,16 @@ export const APP_COLORS = {
 
   // Consistent Tailwind CSS class utility map
   classes: {
-    primaryBg: 'bg-blue-600',
-    primaryBgHover: 'hover:bg-blue-700',
-    primaryText: 'text-blue-600',
-    primaryBorder: 'border-blue-600',
-    primaryLightBg: 'bg-blue-50',
-    primaryLightText: 'text-blue-700',
-    primaryLightBorder: 'border-blue-200',
-    primaryFocus: 'focus:border-blue-500 focus:ring-blue-500/10',
-    primaryActiveTab: 'bg-blue-50 text-blue-700 border-blue-200 shadow-xs',
-    primaryBadge: 'bg-blue-50 text-blue-700 border-blue-200',
-    primaryGradient: 'bg-gradient-to-tr from-blue-600 to-blue-500',
+    primaryBg: 'bg-[#088839]',
+    primaryBgHover: 'hover:bg-[#066d2e]',
+    primaryText: 'text-[#088839]',
+    primaryBorder: 'border-[#088839]',
+    primaryLightBg: 'bg-[#e6f4eb]',
+    primaryLightText: 'text-[#066d2e]',
+    primaryLightBorder: 'border-[#b5e0c5]',
+    primaryFocus: 'focus:border-[#088839] focus:ring-[#088839]/10',
+    primaryActiveTab: 'bg-[#e6f4eb] text-[#066d2e] border-[#b5e0c5] shadow-xs',
+    primaryBadge: 'bg-[#e6f4eb] text-[#066d2e] border-[#b5e0c5]',
+    primaryGradient: 'bg-gradient-to-tr from-[#088839] to-[#0aa344]',
   },
 } as const;

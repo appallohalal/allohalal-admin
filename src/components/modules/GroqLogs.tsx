@@ -19,7 +19,6 @@ import {
   Eye,
   EyeOff,
   Save,
-  Play,
   Activity,
   ChevronLeft,
   ChevronRight,
@@ -49,14 +48,11 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
   logs,
   settings: initialSettings,
   onSaveSettings,
-  onRefreshLogs,
 }) => {
   const [form, setForm] = useState<GroqSettings>(initialSettings || DEFAULT_GROQ_SETTINGS);
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  const [isTesting, setIsTesting] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'SUCCESS' | 'RATE_LIMITED' | 'ERROR'>('ALL');
   const [copied, setCopied] = useState(false);
@@ -89,50 +85,6 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
       toast.error(`Save failed: ${err.message || err}`, 'Save Error');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleTestConnection = async () => {
-    if (!form.apiKey.trim()) {
-      toast.error('Please enter a Groq API Key before testing.', 'API Key Required');
-      return;
-    }
-
-    const toastId = toast.loading('Testing Groq AI connection...', 'Connection Test');
-    setIsTesting(true);
-
-    try {
-      if (onSaveSettings) {
-        await onSaveSettings(form);
-      }
-
-      const res = await fetch('/api/v1/groq/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          productName: 'Test Product',
-          ingredientsText: 'Wheat, water, salt',
-          language: 'English',
-          barcode: 'TEST-PING',
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        const latency = data.telemetry?.latencyMs || 200;
-        const model = data.telemetry?.model || form.model;
-        toast.dismiss(toastId);
-        toast.success(`Connected (${latency}ms) • ${model}`, 'Connection Verified');
-        if (onRefreshLogs) onRefreshLogs();
-      } else {
-        toast.dismiss(toastId);
-        toast.error(data.error || 'Connection failed. Please verify API key.', 'Connection Error');
-      }
-    } catch (err: any) {
-      toast.dismiss(toastId);
-      toast.error(err.message || 'Network error occurred during test.', 'Connection Error');
-    } finally {
-      setIsTesting(false);
     }
   };
 
@@ -252,21 +204,7 @@ export const GroqLogs: React.FC<GroqLogsProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={handleTestConnection}
-              disabled={isTesting || !form.apiKey}
-              className="px-4 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isTesting ? (
-                <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Play className={`w-3.5 h-3.5 ${c.primaryText}`} />
-              )}
-              <span>{isTesting ? 'Testing...' : 'Test Connection'}</span>
-            </button>
-
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={handleSaveSettings}

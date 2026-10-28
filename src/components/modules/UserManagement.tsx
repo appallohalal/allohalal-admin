@@ -224,7 +224,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         {/* Header & Controls */}
         <div className="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-[#e6f4eb] text-[#088839] border border-[#b5e0c5] flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
             <div>

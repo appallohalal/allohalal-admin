@@ -175,3 +175,29 @@ export interface AuthSettings {
   updatedBy: string;
 }
 
+export interface PushNotification {
+  id: string;
+  title: string;
+  message: string;
+  targetAudience: string;
+  deliveryStatus: 'SENT' | 'FAILED' | 'PENDING';
+  recipientsCount: number;
+  fcmMessageId?: string;
+  sentBy: string;
+  sentAt: string;
+  metadata?: Record<string, any>;
+}
+
+export interface NotificationSettings {
+  id: string;
+  firebaseProjectId: string;
+  firebaseApiKey: string;
+  firebaseAppId: string;
+  firebaseMessagingSenderId: string;
+  firebaseServiceAccountJson: string;
+  firebaseServerKey?: string;
+  isEnabled: boolean;
+  updatedAt: string;
+  updatedBy: string;
+}
+

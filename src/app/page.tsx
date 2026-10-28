@@ -12,12 +12,15 @@ import { GeoAds } from '@/components/modules/GeoAds';
 import { AnalyticsDashboard } from '@/components/modules/AnalyticsDashboard';
 import { GroqLogs } from '@/components/modules/GroqLogs';
 import { AdMobSettingsView } from '@/components/modules/AdMobSettings';
+import { NotificationManager } from '@/components/modules/NotificationManager';
 import { AuthPage } from '@/components/auth/AuthPage';
 import { AdminUser, getStoredAuthUser, logoutAdmin } from '@/lib/auth';
 
 import {
   fetchProducts,
   updateProductStatus,
+  saveProduct,
+  deleteProduct,
   fetchAdditives,
   saveAdditive,
   deleteAdditive,
@@ -26,6 +29,7 @@ import {
   toggleUserPremium,
   fetchAds,
   saveGeoAd,
+  deleteGeoAd,
   toggleAdActive,
   fetchLogs,
   fetchAdMobSettings,
@@ -45,6 +49,7 @@ const VALID_TABS: NavTab[] = [
   'dashboard',
   'products',
   'additives',
+  'notifications',
   'users',
   'admins',
   'admob',
@@ -168,6 +173,16 @@ export default function AdminDashboardPage() {
     setProducts(updated);
   };
 
+  const handleSaveProduct = async (product: Product) => {
+    const updated = await saveProduct(product);
+    setProducts(updated);
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    const updated = await deleteProduct(productId);
+    setProducts(updated);
+  };
+
   const handleQuickVerify = async (productId: string, status: HalalStatus) => {
     const defaultNote =
       status === 'HALAL'
@@ -209,6 +224,11 @@ export default function AdminDashboardPage() {
 
   const handleToggleAdActive = async (adId: string) => {
     const updated = await toggleAdActive(adId);
+    setAds(updated);
+  };
+
+  const handleDeleteAd = async (adId: string) => {
+    const updated = await deleteGeoAd(adId);
     setAds(updated);
   };
 
@@ -295,6 +315,9 @@ export default function AdminDashboardPage() {
               <ProductCatalog
                 products={products}
                 onUpdateStatus={handleUpdateProductStatus}
+                onSaveProduct={handleSaveProduct}
+                onDeleteProduct={handleDeleteProduct}
+                currentAdminName={currentUser?.name}
                 searchQuery={searchQuery}
               />
             )}
@@ -327,6 +350,10 @@ export default function AdminDashboardPage() {
               />
             )}
 
+            {activeTab === 'notifications' && (
+              <NotificationManager currentUser={currentUser || undefined} users={users} />
+            )}
+
             {activeTab === 'admob' && (
               <AdMobSettingsView
                 settings={admobSettings}
@@ -340,6 +367,7 @@ export default function AdminDashboardPage() {
                 ads={ads}
                 onSaveAd={handleSaveAd}
                 onToggleActive={handleToggleAdActive}
+                onDeleteAd={handleDeleteAd}
                 searchQuery={searchQuery}
               />
             )}

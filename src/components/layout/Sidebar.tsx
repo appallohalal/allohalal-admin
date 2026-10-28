@@ -12,11 +12,12 @@ import {
   ShieldCheck,
   UserCog,
   Radio,
+  Bell,
 } from 'lucide-react';
 
 import { APP_COLORS } from '@/lib/colors';
 
-export type NavTab = 'dashboard' | 'products' | 'additives' | 'users' | 'admins' | 'ads' | 'admob' | 'analytics' | 'logs';
+export type NavTab = 'dashboard' | 'products' | 'additives' | 'users' | 'admins' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -48,6 +49,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       label: 'Additives',
       sublabel: 'E-Numbers',
       icon: BookOpenCheck,
+    },
+    {
+      id: 'notifications' as NavTab,
+      label: 'Push Alerts',
+      sublabel: 'Firebase FCM',
+      icon: Bell,
     },
     {
       id: 'users' as NavTab,
@@ -94,12 +101,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       {/* Brand Logo & Header */}
       <div className="p-5 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-blue-500 flex items-center justify-center shadow-md shadow-blue-600/20">
-            <ShieldCheck className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-xl overflow-hidden bg-[#088839] flex items-center justify-center shadow-md shadow-[#088839]/20 shrink-0">
+            <img src="/logo.png" alt="Allo Halal" className="w-full h-full object-cover" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-lg text-slate-900 tracking-tight">HalalLens</span>
+              <span className="font-bold text-lg text-slate-900 tracking-tight">Allo Halal</span>
               <span className={`text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder} border`}>
                 Admin
               </span>
