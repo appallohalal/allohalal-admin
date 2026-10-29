@@ -13,6 +13,7 @@ import { AnalyticsDashboard } from '@/components/modules/AnalyticsDashboard';
 import { GroqLogs } from '@/components/modules/GroqLogs';
 import { AdMobSettingsView } from '@/components/modules/AdMobSettings';
 import { NotificationManager } from '@/components/modules/NotificationManager';
+import { AppCmsManager } from '@/components/modules/AppCmsManager';
 import { AuthPage } from '@/components/auth/AuthPage';
 import { AdminUser, getStoredAuthUser, logoutAdmin } from '@/lib/auth';
 
@@ -27,6 +28,7 @@ import {
   fetchUsers,
   toggleUserBan,
   toggleUserPremium,
+  deleteUserAccount,
   fetchAds,
   saveGeoAd,
   deleteGeoAd,
@@ -41,14 +43,18 @@ import {
   fetchAuthSettings,
   saveAuthSettings,
   DEFAULT_AUTH_SETTINGS,
+  fetchCmsSettings,
+  saveCmsSettings,
+  DEFAULT_CMS_SETTINGS,
 } from '@/lib/storage';
-import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings } from '@/lib/types';
+import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, CmsSettings } from '@/lib/types';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 
 const VALID_TABS: NavTab[] = [
   'dashboard',
   'products',
   'additives',
+  'cms',
   'notifications',
   'users',
   'admins',
@@ -72,6 +78,7 @@ export default function AdminDashboardPage() {
   const [admobSettings, setAdmobSettings] = useState<AdMobSettings>(DEFAULT_ADMOB_SETTINGS);
   const [groqSettings, setGroqSettings] = useState<GroqSettings>(DEFAULT_GROQ_SETTINGS);
   const [authSettings, setAuthSettings] = useState<AuthSettings>(DEFAULT_AUTH_SETTINGS);
+  const [cmsSettings, setCmsSettings] = useState<CmsSettings>(DEFAULT_CMS_SETTINGS);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Restore and sync active tab from URL hash and localStorage
@@ -126,7 +133,7 @@ export default function AdminDashboardPage() {
           setCurrentUser(user);
         }
 
-        const [prods, adds, usrs, adList, logList, admob, groq, authSet] = await Promise.all([
+        const [prods, adds, usrs, adList, logList, admob, groq, authSet, cmsSet] = await Promise.all([
           fetchProducts(),
           fetchAdditives(),
           fetchUsers(),
@@ -135,6 +142,7 @@ export default function AdminDashboardPage() {
           fetchAdMobSettings(),
           fetchGroqSettings(),
           fetchAuthSettings(),
+          fetchCmsSettings(),
         ]);
         if (isMounted) {
           setProducts(prods);
@@ -145,6 +153,7 @@ export default function AdminDashboardPage() {
           setAdmobSettings(admob);
           setGroqSettings(groq);
           setAuthSettings(authSet);
+          setCmsSettings(cmsSet);
         }
       } catch (err) {
         console.error('Error loading Supabase data:', err);
@@ -217,6 +226,11 @@ export default function AdminDashboardPage() {
     setUsers(updated);
   };
 
+  const handleDeleteUser = async (userId: string) => {
+    const updated = await deleteUserAccount(userId);
+    setUsers(updated);
+  };
+
   const handleSaveAd = async (ad: GeoAd) => {
     const updated = await saveGeoAd(ad);
     setAds(updated);
@@ -245,6 +259,11 @@ export default function AdminDashboardPage() {
   const handleSaveAuthSettings = async (newSettings: AuthSettings) => {
     const updated = await saveAuthSettings(newSettings, currentUser?.name || 'Admin');
     setAuthSettings(updated);
+  };
+
+  const handleSaveCmsSettings = async (newSettings: CmsSettings) => {
+    const updated = await saveCmsSettings(newSettings, currentUser?.name || 'Admin');
+    setCmsSettings(updated);
   };
 
   const handleLogout = async () => {
@@ -331,11 +350,20 @@ export default function AdminDashboardPage() {
               />
             )}
 
+            {activeTab === 'cms' && (
+              <AppCmsManager
+                settings={cmsSettings}
+                onSave={handleSaveCmsSettings}
+                currentAdminName={currentUser?.name}
+              />
+            )}
+
             {activeTab === 'users' && (
               <UserManagement
                 users={users}
                 onToggleBan={handleToggleBan}
                 onTogglePremium={handleTogglePremium}
+                onDeleteUser={handleDeleteUser}
                 searchQuery={searchQuery}
                 authSettings={authSettings}
                 onSaveAuthSettings={handleSaveAuthSettings}

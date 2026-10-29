@@ -447,5 +447,25 @@ INSERT INTO public.auth_settings (id, force_user_auth, allow_guest_scan)
 VALUES ('global', false, true)
 ON CONFLICT (id) DO NOTHING;
 
+-- ==============================================================================
+-- 14. Dynamic Mobile App UI Text / CMS Configuration Table
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.cms_settings (
+  id VARCHAR(64) PRIMARY KEY DEFAULT 'global',
+  texts JSONB DEFAULT '{}'::jsonb,
+  translations JSONB DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by VARCHAR(128) DEFAULT 'Admin'
+);
+
+ALTER TABLE public.cms_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for cms_settings" ON public.cms_settings;
+CREATE POLICY "Allow all for cms_settings" ON public.cms_settings FOR ALL USING (true) WITH CHECK (true);
+
+INSERT INTO public.cms_settings (id, texts, translations)
+VALUES ('global', '{}'::jsonb, '{}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
+
+
 
 

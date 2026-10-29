@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { sendRegistrationWelcomeEmail } from '@/lib/email';
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: emailResult.emailSent
-        ? `Account created successfully! A confirmation email has been sent to ${insertedUser.email}.`
+        ? `Account created successfully! A welcome email has been sent to ${insertedUser.email}.`
         : 'Account created successfully!',
       emailSent: emailResult.emailSent,
       emailChannel: emailResult.channel,

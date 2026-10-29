@@ -23,12 +23,14 @@ import {
   Save,
   Eye,
   EyeOff,
+  Trash2,
 } from 'lucide-react';
 
 interface UserManagementProps {
   users?: UserAccount[];
   onToggleBan?: (userId: string, reason?: string) => void;
   onTogglePremium?: (userId: string) => void;
+  onDeleteUser?: (userId: string) => Promise<void>;
   searchQuery?: string;
   authSettings?: AuthSettings;
   onSaveAuthSettings?: (settings: AuthSettings) => Promise<void>;
@@ -39,6 +41,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   users = [],
   onToggleBan,
   onTogglePremium,
+  onDeleteUser,
   searchQuery = '',
   authSettings: initialSettings,
   onSaveAuthSettings,
@@ -54,6 +57,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [banModalUser, setBanModalUser] = useState<UserAccount | null>(null);
   const [banReasonInput, setBanReasonInput] = useState('');
+  const [deleteConfirmUser, setDeleteConfirmUser] = useState<UserAccount | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
   const itemsPerPage = 20;
 
   useEffect(() => {
@@ -139,13 +144,17 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     const updatedPayload: AuthSettings = {
       ...form,
       id: 'global',
+      emailProvider: 'SMTP',
+      smtpHost: 'smtp.gmail.com',
+      smtpPort: 587,
+      smtpFromEmail: form.smtpUser || form.smtpFromEmail || '',
       updatedAt: new Date().toISOString(),
       updatedBy: currentAdminName,
     };
 
     try {
       await onSaveAuthSettings(updatedPayload);
-      toast.success('Registration Email & SMTP settings saved successfully.', 'Settings Saved');
+      toast.success('Gmail SMTP settings saved successfully.', 'Settings Saved');
       setShowSmtpSettings(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to save SMTP settings.', 'Save Error');
@@ -219,83 +228,83 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
   return (
     <div className="space-y-6 pb-16">
-      {/* 1. Master Login Required Switch (AdMob Pattern, clean without Last Updated / Save footer) */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex items-center justify-between gap-6">
-        <div className="flex items-center gap-4">
-          <div
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-              form.forceUserAuth
-                ? `${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder} border shadow-xs`
-                : 'bg-slate-100 text-slate-400 border border-slate-200'
+      {/* 1. Top Policy & Email Toggle Cards (Matched 2-Column Clean Project Pattern) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Card A: Login Required */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <div
+              className={`w-12 h-12 rounded-2xl shrink-0 flex items-center justify-center transition-all ${
+                form.forceUserAuth
+                  ? `${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder} border shadow-xs`
+                  : 'bg-slate-100 text-slate-400 border border-slate-200'
+              }`}
+            >
+              {form.forceUserAuth ? (
+                <Lock className="w-6 h-6 animate-pulse" />
+              ) : (
+                <Unlock className="w-6 h-6" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                  Login Required
+                </h2>
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-colors ${
+                    form.forceUserAuth
+                      ? `${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {form.forceUserAuth ? 'Active' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
+                {form.forceUserAuth
+                  ? 'Login is mandatory to scan products in the mobile app'
+                  : 'Guest scanning is allowed without login'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.forceUserAuth}
+            onClick={handleToggle}
+            disabled={isSaving}
+            className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#088839]/20 disabled:opacity-50 ${
+              form.forceUserAuth ? c.primaryBg : 'bg-slate-200'
             }`}
           >
-            {form.forceUserAuth ? (
-              <Lock className="w-6 h-6 animate-pulse" />
-            ) : (
-              <Unlock className="w-6 h-6" />
-            )}
-          </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                Login Required
-              </h2>
-              <span
-                className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-colors ${
-                  form.forceUserAuth
-                    ? `${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`
-                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                }`}
-              >
-                {form.forceUserAuth ? 'Active' : 'Disabled'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              {form.forceUserAuth
-                ? 'Login is mandatory to scan products in the mobile app'
-                : 'Guest scanning is allowed without login'}
-            </p>
-          </div>
+            <span className="sr-only">Toggle Login Required</span>
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                form.forceUserAuth ? 'translate-x-7' : 'translate-x-0'
+              }`}
+            />
+          </button>
         </div>
 
-        {/* Toggle Switch */}
-        <button
-          type="button"
-          role="switch"
-          aria-checked={form.forceUserAuth}
-          onClick={handleToggle}
-          disabled={isSaving}
-          className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#088839]/20 disabled:opacity-50 ${
-            form.forceUserAuth ? c.primaryBg : 'bg-slate-200'
-          }`}
-        >
-          <span className="sr-only">Toggle Login Required</span>
-          <span
-            aria-hidden="true"
-            className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-              form.forceUserAuth ? 'translate-x-7' : 'translate-x-0'
-            }`}
-          />
-        </button>
-      </div>
-
-      {/* 1.5. Registration Email Notifications (Supabase / SMTP) */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+        {/* Card B: Registration Email */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
             <div
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
+              className={`w-12 h-12 rounded-2xl shrink-0 flex items-center justify-center transition-all ${
                 form.sendWelcomeEmail !== false
                   ? `${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder} border shadow-xs`
                   : 'bg-slate-100 text-slate-400 border border-slate-200'
               }`}
             >
-              <Mail className="w-6 h-6" />
+              <Mail className={`w-6 h-6 ${form.sendWelcomeEmail !== false ? 'animate-pulse' : ''}`} />
             </div>
-            <div>
-              <div className="flex items-center gap-2.5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                  Registration Email Notifications
+                  Registration Email
                 </h2>
                 <span
                   className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-colors ${
@@ -306,158 +315,43 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 >
                   {form.sendWelcomeEmail !== false ? 'Active' : 'Disabled'}
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setShowSmtpSettings(true)}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors cursor-pointer"
+                  title="Configure SMTP & Email Provider"
+                >
+                  <Server className="w-3 h-3 text-[#088839]" />
+                  <span>SMTP</span>
+                </button>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                Automatically send transactional welcome &amp; confirmation emails upon new user registration (via Supabase Auth or Custom SMTP)
+              <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
+                {form.sendWelcomeEmail !== false
+                  ? 'Welcome & confirmation email sent on new signup'
+                  : 'Registration welcome emails are turned off'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setShowSmtpSettings(!showSmtpSettings)}
-              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Server className="w-3.5 h-3.5 text-[#088839]" />
-              <span>{showSmtpSettings ? 'Hide SMTP Settings' : 'Configure SMTP / Provider'}</span>
-            </button>
-
-            <button
-              type="button"
-              role="switch"
-              aria-checked={form.sendWelcomeEmail !== false}
-              onClick={handleToggleWelcomeEmail}
-              disabled={isSaving}
-              className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#088839]/20 disabled:opacity-50 ${
-                form.sendWelcomeEmail !== false ? c.primaryBg : 'bg-slate-200'
+          <button
+            type="button"
+            role="switch"
+            aria-checked={form.sendWelcomeEmail !== false}
+            onClick={handleToggleWelcomeEmail}
+            disabled={isSaving}
+            className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#088839]/20 disabled:opacity-50 ${
+              form.sendWelcomeEmail !== false ? c.primaryBg : 'bg-slate-200'
+            }`}
+          >
+            <span className="sr-only">Toggle Registration Email</span>
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                form.sendWelcomeEmail !== false ? 'translate-x-7' : 'translate-x-0'
               }`}
-            >
-              <span className="sr-only">Toggle Registration Email</span>
-              <span
-                aria-hidden="true"
-                className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                  form.sendWelcomeEmail !== false ? 'translate-x-7' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
+            />
+          </button>
         </div>
-
-        {showSmtpSettings && (
-          <form onSubmit={handleSaveEmailSettings} className="pt-4 border-t border-slate-100 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Email Delivery Channel
-                </label>
-                <select
-                  value={form.emailProvider || 'BOTH'}
-                  onChange={(e) => setForm((p) => ({ ...p, emailProvider: e.target.value as any }))}
-                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white ${c.primaryFocus} cursor-pointer`}
-                >
-                  <option value="BOTH">Supabase Auth + Custom SMTP (Recommended)</option>
-                  <option value="SUPABASE">Supabase Auth Only</option>
-                  <option value="SMTP">Custom SMTP Server Only</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  SMTP Host
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. smtp.gmail.com or smtp.hostinger.com"
-                  value={form.smtpHost || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, smtpHost: e.target.value }))}
-                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  SMTP Port
-                </label>
-                <input
-                  type="number"
-                  placeholder="587 or 465"
-                  value={form.smtpPort || 587}
-                  onChange={(e) => setForm((p) => ({ ...p, smtpPort: Number(e.target.value) }))}
-                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  SMTP Username / Email
-                </label>
-                <input
-                  type="text"
-                  placeholder="noreply@yourdomain.com"
-                  value={form.smtpUser || ''}
-                  onChange={(e) => setForm((p) => ({ ...p, smtpUser: e.target.value }))}
-                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  SMTP Password / App Password
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type={showSmtpPass ? 'text' : 'password'}
-                    placeholder="••••••••••••"
-                    value={form.smtpPass || ''}
-                    onChange={(e) => setForm((p) => ({ ...p, smtpPass: e.target.value }))}
-                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pr-9 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSmtpPass(!showSmtpPass)}
-                    className="absolute right-2.5 text-slate-400 hover:text-slate-700 cursor-pointer"
-                  >
-                    {showSmtpPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Sender Display Name &amp; From Email
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="text"
-                    placeholder="Allo Halal"
-                    value={form.smtpFromName || ''}
-                    onChange={(e) => setForm((p) => ({ ...p, smtpFromName: e.target.value }))}
-                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
-                  />
-                  <input
-                    type="email"
-                    placeholder="From Email (optional)"
-                    value={form.smtpFromEmail || ''}
-                    onChange={(e) => setForm((p) => ({ ...p, smtpFromEmail: e.target.value }))}
-                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="submit"
-                disabled={isSaving}
-                className={`px-5 py-2 rounded-xl ${c.primaryBg} ${c.primaryBgHover} text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50`}
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>{isSaving ? 'Saving...' : 'Save Email Settings'}</span>
-              </button>
-            </div>
-          </form>
-        )}
       </div>
 
       {/* 2. Registered App Users List (Clean project pattern) */}
@@ -641,26 +535,36 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
                       {/* Action */}
                       <td className="py-3 px-4 text-right whitespace-nowrap">
-                        {user.isBanned ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          {user.isBanned ? (
+                            <button
+                              type="button"
+                              onClick={() => handleUnban(user)}
+                              className="px-2.5 py-1 text-[11px] rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 transition-colors cursor-pointer"
+                            >
+                              Unban
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBanModalUser(user);
+                                setBanReasonInput('');
+                              }}
+                              className="px-2.5 py-1 text-[11px] rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold border border-rose-200 transition-colors cursor-pointer"
+                            >
+                              Ban
+                            </button>
+                          )}
                           <button
                             type="button"
-                            onClick={() => handleUnban(user)}
-                            className="px-2.5 py-1 text-[11px] rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 transition-colors cursor-pointer"
+                            title="Delete User (GDPR Right to be Forgotten)"
+                            onClick={() => setDeleteConfirmUser(user)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-colors cursor-pointer"
                           >
-                            Unban
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setBanModalUser(user);
-                              setBanReasonInput('');
-                            }}
-                            className="px-2.5 py-1 text-[11px] rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold border border-rose-200 transition-colors cursor-pointer"
-                          >
-                            Ban
-                          </button>
-                        )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -796,6 +700,161 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 Confirm Ban
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Gmail SMTP Configuration Modal */}
+      {showSmtpSettings && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-xl ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder} border flex items-center justify-center`}>
+                  <Mail className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Gmail SMTP Configuration</h3>
+                  <p className="text-[11px] text-slate-500">smtp.gmail.com · Port 587 (TLS)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSmtpSettings(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEmailSettings} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Sender Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="Allo Halal"
+                  value={form.smtpFromName || ''}
+                  onChange={(e) => setForm((p) => ({ ...p, smtpFromName: e.target.value }))}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white focus:outline-none ${c.primaryFocus}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Gmail Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="yourname@gmail.com"
+                  value={form.smtpUser || ''}
+                  onChange={(e) => setForm((p) => ({ ...p, smtpUser: e.target.value }))}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white focus:outline-none ${c.primaryFocus}`}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Gmail App Password
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type={showSmtpPass ? 'text' : 'password'}
+                    placeholder="16-character Google App Password"
+                    value={form.smtpPass || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, smtpPass: e.target.value }))}
+                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pr-9 text-xs font-mono text-slate-800 focus:bg-white focus:outline-none ${c.primaryFocus}`}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSmtpPass(!showSmtpPass)}
+                    className="absolute right-2.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    {showSmtpPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowSmtpSettings(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className={`px-5 py-2 rounded-xl ${c.primaryBg} ${c.primaryBgHover} text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50`}
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSaving ? 'Saving...' : 'Save Settings'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User GDPR Confirmation Modal */}
+      {deleteConfirmUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Delete User Account (GDPR Art. 17)
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Are you sure you want to permanently delete the account for <strong className="text-slate-800">{deleteConfirmUser.name || deleteConfirmUser.email}</strong>?
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-xs text-red-700 leading-relaxed">
+              <strong>Warning:</strong> In compliance with GDPR Right to be Forgotten, this action is irreversible and permanently purges all personal data, email, and scan records from the database.
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeletingUser}
+                onClick={() => setDeleteConfirmUser(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingUser}
+                onClick={async () => {
+                  if (!onDeleteUser) {
+                    setDeleteConfirmUser(null);
+                    return;
+                  }
+                  setIsDeletingUser(true);
+                  try {
+                    await onDeleteUser(deleteConfirmUser.id);
+                    toast.success('User account permanently deleted in compliance with GDPR.', 'Account Deleted');
+                    setDeleteConfirmUser(null);
+                  } catch (err: any) {
+                    toast.error(err.message || 'Failed to delete user.', 'Delete Error');
+                  } finally {
+                    setIsDeletingUser(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingUser ? 'Deleting...' : 'Delete Permanently'}
               </button>
             </div>
           </div>

@@ -26,6 +26,10 @@ const TAB_TITLES: Record<NavTab, { title: string; desc: string }> = {
     title: 'Additives',
     desc: 'E-numbers dictionary',
   },
+  cms: {
+    title: 'Legal Pages & App CMS (GDPR Compliance)',
+    desc: 'Manage Privacy Policy (GDPR), Help & Support, About, and UI copy live',
+  },
   notifications: {
     title: 'Push Notifications',
     desc: 'Send push notifications to mobile devices',

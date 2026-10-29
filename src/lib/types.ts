@@ -209,3 +209,62 @@ export interface NotificationSettings {
   updatedBy: string;
 }
 
+export interface CmsTexts {
+  // Brand & Home Hero
+  appName: string;
+  splashSubtitle: string;
+  heroSubtitle: string;
+  scanBarcodeBtn: string;
+  analyzeTextBtn: string;
+  manualEntryBtn: string;
+
+  // Home Feature Cards
+  feature1Title: string;
+  feature1Desc: string;
+  feature2Title: string;
+  feature2Desc: string;
+  feature3Title: string;
+  feature3Desc: string;
+
+  // Onboarding Slides
+  onboarding1Title: string;
+  onboarding1Desc: string;
+  onboarding2Title: string;
+  onboarding2Desc: string;
+  onboarding3Title: string;
+  onboarding3Desc: string;
+  onboarding4Title: string;
+  onboarding4Desc: string;
+
+  // Auth & Analysis
+  loginTitle: string;
+  loginSubtitle: string;
+  registerTitle: string;
+  registerSubtitle: string;
+  textScanTitle: string;
+  textScanSubtitle: string;
+  resultDisclaimer: string;
+
+  // Info & Legal Pages (GDPR Compliance & Help)
+  aboutTitle: string;
+  aboutContent: string;
+  helpTitle: string;
+  helpContent: string;
+  privacyTitle: string;
+  privacyContent: string;
+  termsTitle?: string;
+  termsContent?: string;
+
+  // Geo-Ads & Proximity Custom Message
+  geoAdsNoticeText?: string;
+}
+
+export interface CmsSettings {
+  id: string;
+  texts: CmsTexts;
+  translations?: Record<string, Partial<CmsTexts>>;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+

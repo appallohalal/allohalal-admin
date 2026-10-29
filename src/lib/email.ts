@@ -1,6 +1,5 @@
 import net from 'net';
 import tls from 'tls';
-import crypto from 'crypto';
 import { supabase } from './supabase';
 
 export interface SmtpConfig {
@@ -22,24 +21,22 @@ export interface WelcomeEmailParams {
   originUrl?: string;
 }
 
-export function generateEmailVerificationToken(email: string): string {
-  const secret = process.env.SUPABASE_JWT_SECRET || 'allohalal_email_verify_secret_v1';
-  return crypto
-    .createHmac('sha256', secret)
-    .update(email.trim().toLowerCase())
-    .digest('hex')
-    .substring(0, 32);
-}
-
 export function buildWelcomeEmailHtml(params: {
   name: string;
   username: string;
   email: string;
   country?: string;
   city?: string;
-  confirmUrl: string;
+  logoUrl?: string;
 }): string {
   const location = [params.city, params.country].filter(Boolean).join(', ') || 'Global';
+  const joinedDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+  const logoUrl = params.logoUrl || 'https://halallens-admin.vercel.app/logo.png';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -47,82 +44,127 @@ export function buildWelcomeEmailHtml(params: {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Welcome to Allo Halal</title>
 </head>
-<body style="margin:0;padding:0;background-color:#f4f7f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1e293b;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f7f5;padding:32px 16px;">
+<body style="margin:0;padding:0;background-color:#eef5f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#eef5f0;padding:40px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 10px 25px rgba(8,136,57,0.08);">
-          <!-- Header -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:580px;background-color:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #d5e8dc;box-shadow:0 16px 40px rgba(8,136,57,0.10);">
+          
+          <!-- Top Brand Banner -->
           <tr>
-            <td style="background:linear-gradient(135deg,#088839 0%,#066d2e 100%);padding:32px 28px;text-align:center;">
-              <div style="display:inline-block;background-color:rgba(255,255,255,0.15);border-radius:14px;padding:10px 18px;margin-bottom:12px;">
-                <span style="color:#ffffff;font-size:20px;font-weight:800;letter-spacing:0.5px;">ALLO HALAL</span>
+            <td style="background:linear-gradient(135deg,#088839 0%,#055a25 100%);padding:40px 32px 36px;text-align:center;">
+              <img src="${logoUrl}" alt="Allo Halal" width="68" height="68" style="display:block;margin:0 auto 16px;width:68px;height:68px;border-radius:18px;border:2px solid rgba(255,255,255,0.28);background-color:#088839;object-fit:cover;" />
+              <div style="display:inline-block;background-color:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.25);border-radius:999px;padding:5px 14px;margin-bottom:12px;">
+                <span style="color:#ffffff;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">&#10003; Registration Complete</span>
               </div>
-              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:800;line-height:1.3;">
+              <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">
                 Welcome to Allo Halal!
               </h1>
-              <p style="margin:8px 0 0;color:#d1fae5;font-size:14px;font-weight:500;">
-                Your AI-Powered Halal Product &amp; Ingredient Scanner
+              <p style="margin:8px 0 0;color:#d1fae5;font-size:14px;font-weight:500;line-height:1.5;">
+                Your trusted AI-powered companion for verifying Halal products &amp; ingredients
               </p>
             </td>
           </tr>
 
-          <!-- Body -->
+          <!-- Main Content -->
           <tr>
-            <td style="padding:32px 28px;">
-              <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#334155;">
-                Assalamu Alaikum <strong>${params.name}</strong>,
+            <td style="padding:36px 32px 28px;">
+              <p style="margin:0 0 12px;font-size:16px;line-height:1.6;color:#0f172a;">
+                Assalamu Alaikum <strong style="color:#088839;">${params.name}</strong>,
               </p>
-              <p style="margin:0 0 24px;font-size:14px;line-height:1.6;color:#475569;">
-                Thank you for registering with <strong>Allo Halal</strong>! Your account has been created successfully. Please confirm your email address below to complete your registration.
+              <p style="margin:0 0 28px;font-size:14px;line-height:1.7;color:#475569;">
+                Thank you for joining the <strong>Allo Halal</strong> community! Your account is now active and ready to use across the mobile app. Here is a summary of your registered profile:
               </p>
 
-              <!-- CTA Button -->
-              <div style="text-align:center;margin:28px 0;">
-                <a href="${params.confirmUrl}" style="display:inline-block;background-color:#088839;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 32px;border-radius:12px;box-shadow:0 4px 12px rgba(8,136,57,0.25);">
-                  Confirm Email Address
-                </a>
-              </div>
-
-              <!-- Account Details Box -->
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:18px;margin-bottom:24px;">
+              <!-- Account Details Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f8fbf9;border:1px solid #d5e8dc;border-radius:18px;overflow:hidden;margin-bottom:28px;">
                 <tr>
-                  <td colspan="2" style="padding-bottom:10px;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:#088839;">
-                    Registered Account Summary
+                  <td colspan="2" style="background-color:#e6f4eb;padding:12px 20px;border-bottom:1px solid #cce5d4;">
+                    <span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#066d2e;">
+                      Account Profile Details
+                    </span>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding-top:10px;font-size:13px;color:#64748b;">Full Name:</td>
-                  <td style="padding-top:10px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;">${params.name}</td>
+                  <td style="padding:13px 20px 8px;font-size:13px;color:#64748b;">Full Name</td>
+                  <td style="padding:13px 20px 8px;font-size:13px;font-weight:700;color:#0f172a;text-align:right;">${params.name}</td>
                 </tr>
                 <tr>
-                  <td style="padding-top:6px;font-size:13px;color:#64748b;">Username:</td>
-                  <td style="padding-top:6px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;">@${params.username}</td>
+                  <td style="padding:8px 20px;font-size:13px;color:#64748b;border-top:1px dashed #e2e8f0;">Username</td>
+                  <td style="padding:8px 20px;font-size:13px;font-weight:700;color:#088839;text-align:right;border-top:1px dashed #e2e8f0;">@${params.username}</td>
                 </tr>
                 <tr>
-                  <td style="padding-top:6px;font-size:13px;color:#64748b;">Email:</td>
-                  <td style="padding-top:6px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;">${params.email}</td>
+                  <td style="padding:8px 20px;font-size:13px;color:#64748b;border-top:1px dashed #e2e8f0;">Email Address</td>
+                  <td style="padding:8px 20px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;border-top:1px dashed #e2e8f0;">${params.email}</td>
                 </tr>
                 <tr>
-                  <td style="padding-top:6px;font-size:13px;color:#64748b;">Location:</td>
-                  <td style="padding-top:6px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;">${location}</td>
+                  <td style="padding:8px 20px;font-size:13px;color:#64748b;border-top:1px dashed #e2e8f0;">Location</td>
+                  <td style="padding:8px 20px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;border-top:1px dashed #e2e8f0;">${location}</td>
+                </tr>
+                <tr>
+                  <td style="padding:8px 20px 14px;font-size:13px;color:#64748b;border-top:1px dashed #e2e8f0;">Joined On</td>
+                  <td style="padding:8px 20px 14px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;border-top:1px dashed #e2e8f0;">${joinedDate}</td>
                 </tr>
               </table>
 
-              <p style="margin:0;font-size:13px;line-height:1.6;color:#64748b;">
-                With Allo Halal, you can scan barcodes, analyze ingredient labels using AI, and check E-Numbers in 14 languages anytime.
+              <!-- Key Features Section -->
+              <p style="margin:0 0 14px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">
+                What You Can Do in Allo Halal
               </p>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:10px;">
+                <tr>
+                  <td style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+                    <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">
+                      &#128247; Instant Barcode &amp; Product Scanner
+                    </div>
+                    <div style="font-size:12px;color:#64748b;line-height:1.5;">
+                      Scan any food barcode to immediately check its verified Halal, Haram, or Mushbooh status.
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:10px;">
+                <tr>
+                  <td style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+                    <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">
+                      &#10024; AI Ingredient Label Analysis
+                    </div>
+                    <div style="font-size:12px;color:#64748b;line-height:1.5;">
+                      Take a photo of ingredient labels or paste text for instant AI-powered Halal compliance checks.
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+                    <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">
+                      &#127760; 14-Language E-Numbers Dictionary
+                    </div>
+                    <div style="font-size:12px;color:#64748b;line-height:1.5;">
+                      Understand food additives and E-Numbers with clear scholarly explanations in your native language.
+                    </div>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background-color:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 28px;text-align:center;">
-              <p style="margin:0;font-size:12px;color:#94a3b8;">
+            <td style="background-color:#f8fbf9;border-top:1px solid #e2e8f0;padding:22px 32px;text-align:center;">
+              <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#088839;">
+                Allo Halal — Smart Halal Scanner
+              </p>
+              <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.5;">
                 &copy; ${new Date().getFullYear()} Allo Halal. All rights reserved.
               </p>
             </td>
           </tr>
+
         </table>
       </td>
     </tr>
@@ -175,7 +217,6 @@ export async function sendSmtpEmail(
         const onData = (chunk: Buffer) => {
           buffer += chunk.toString('utf8');
           const lines = buffer.split('\r\n');
-          // Check if last complete line is a final SMTP response (3 digits followed by space)
           for (let i = 0; i < lines.length - 1; i++) {
             const line = lines[i];
             if (/^\d{3} /.test(line)) {
@@ -217,7 +258,6 @@ export async function sendSmtpEmail(
 
         await sendCmd(activeSocket, `EHLO allohalal.app`, [250]);
 
-        // Upgrade via STARTTLS if on port 587/25/2525
         if (!isTls) {
           await sendCmd(activeSocket, 'STARTTLS', [220]);
           activeSocket = await new Promise<tls.TLSSocket>((res, rej) => {
@@ -236,17 +276,14 @@ export async function sendSmtpEmail(
           await sendCmd(activeSocket, `EHLO allohalal.app`, [250]);
         }
 
-        // Authenticate via AUTH LOGIN
         await sendCmd(activeSocket, 'AUTH LOGIN', [334]);
         await sendCmd(activeSocket, Buffer.from(user, 'utf8').toString('base64'), [334]);
         await sendCmd(activeSocket, Buffer.from(pass, 'utf8').toString('base64'), [235]);
 
-        // Envelope
         await sendCmd(activeSocket, `MAIL FROM:<${fromEmail}>`, [250]);
         await sendCmd(activeSocket, `RCPT TO:<${toEmail}>`, [250, 251]);
         await sendCmd(activeSocket, 'DATA', [354]);
 
-        // Construct MIME message
         const encodedSubject = `=?UTF-8?B?${Buffer.from(subject, 'utf8').toString('base64')}?=`;
         const encodedFromName = `=?UTF-8?B?${Buffer.from(fromName, 'utf8').toString('base64')}?=`;
         const base64Html = Buffer.from(htmlBody, 'utf8')
@@ -304,7 +341,7 @@ export async function sendSmtpEmail(
 }
 
 /**
- * Triggers registration welcome & confirmation email via Supabase Auth and/or configured SMTP.
+ * Triggers registration welcome email via configured Gmail SMTP.
  */
 export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): Promise<{
   emailSent: boolean;
@@ -315,17 +352,13 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
     params.originUrl ||
     process.env.NEXT_PUBLIC_SITE_URL ||
     'https://halallens-admin.vercel.app';
-  const token = generateEmailVerificationToken(params.email);
-  const confirmUrl = `${baseUrl}/auth/confirm?email=${encodeURIComponent(params.email)}&token=${token}`;
 
-  // 1. Load email settings from Supabase `auth_settings`
   let sendWelcomeEmail = true;
-  let emailProvider: 'SUPABASE' | 'SMTP' | 'BOTH' = 'BOTH';
   let smtpConfig: SmtpConfig = {
-    host: process.env.SMTP_HOST || '',
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: Number(process.env.SMTP_PORT || 587),
     user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
+    pass: (process.env.SMTP_PASS || '').replace(/\s+/g, ''),
     fromEmail: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || '',
     fromName: process.env.SMTP_FROM_NAME || 'Allo Halal',
   };
@@ -339,12 +372,11 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
 
     if (data) {
       sendWelcomeEmail = data.send_welcome_email !== false;
-      emailProvider = (data.email_provider || 'BOTH').toUpperCase() as any;
       if (data.smtp_host) smtpConfig.host = data.smtp_host;
       if (data.smtp_port) smtpConfig.port = Number(data.smtp_port);
       if (data.smtp_user) smtpConfig.user = data.smtp_user;
-      if (data.smtp_pass) smtpConfig.pass = data.smtp_pass;
-      if (data.smtp_from_email) smtpConfig.fromEmail = data.smtp_from_email;
+      if (data.smtp_pass) smtpConfig.pass = String(data.smtp_pass).replace(/\s+/g, '');
+      smtpConfig.fromEmail = data.smtp_from_email || data.smtp_user || smtpConfig.fromEmail;
       if (data.smtp_from_name) smtpConfig.fromName = data.smtp_from_name;
     }
   } catch (err) {
@@ -355,93 +387,34 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
     return { emailSent: false, channel: 'DISABLED', details: 'Welcome emails are disabled in settings.' };
   }
 
-  const channelsUsed: string[] = [];
-  const errors: string[] = [];
-
-  // 2. Send via Custom SMTP if configured and enabled
   const hasSmtpCredentials = Boolean(smtpConfig.host && smtpConfig.user && smtpConfig.pass);
-  if ((emailProvider === 'SMTP' || emailProvider === 'BOTH') && hasSmtpCredentials) {
-    const html = buildWelcomeEmailHtml({
-      name: params.name,
-      username: params.username,
-      email: params.email,
-      country: params.country,
-      city: params.city,
-      confirmUrl,
-    });
-
-    const smtpResult = await sendSmtpEmail(
-      smtpConfig,
-      params.email,
-      'Welcome to Allo Halal! Please Confirm Your Email',
-      html
-    );
-
-    if (smtpResult.success) {
-      channelsUsed.push('SMTP');
-    } else if (smtpResult.error) {
-      errors.push(`SMTP: ${smtpResult.error}`);
-    }
+  if (!hasSmtpCredentials) {
+    return {
+      emailSent: false,
+      channel: 'SMTP_NOT_CONFIGURED',
+      details: 'Gmail SMTP credentials (email and App Password) are not configured yet.',
+    };
   }
 
-  // 3. Trigger Supabase Auth Confirmation Email (when provider is SUPABASE, BOTH, or as fallback if SMTP isn't configured)
-  if (emailProvider === 'SUPABASE' || emailProvider === 'BOTH' || channelsUsed.length === 0) {
-    try {
-      const signUpPassword =
-        params.password && params.password.length >= 6
-          ? params.password
-          : `AlloHalal#${crypto.randomBytes(6).toString('hex')}`;
+  const html = buildWelcomeEmailHtml({
+    name: params.name,
+    username: params.username,
+    email: params.email,
+    country: params.country,
+    city: params.city,
+    logoUrl: `${baseUrl}/logo.png`,
+  });
 
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: params.email.trim().toLowerCase(),
-        password: signUpPassword,
-        options: {
-          emailRedirectTo: confirmUrl,
-          data: {
-            name: params.name,
-            username: params.username,
-            country: params.country || '',
-            city: params.city || '',
-            account_type: 'mobile_user',
-          },
-        },
-      });
-
-      if (!signUpError && signUpData?.user) {
-        channelsUsed.push('SUPABASE_AUTH');
-        // If identities is empty (user already existed in auth.users), trigger resend
-        if (Array.isArray(signUpData.user.identities) && signUpData.user.identities.length === 0) {
-          await supabase.auth.resend({
-            type: 'signup',
-            email: params.email.trim().toLowerCase(),
-            options: { emailRedirectTo: confirmUrl },
-          });
-        }
-      } else if (signUpError) {
-        // If user already registered in Supabase Auth, resend confirmation email
-        if (signUpError.message.toLowerCase().includes('already registered')) {
-          const { error: resendErr } = await supabase.auth.resend({
-            type: 'signup',
-            email: params.email.trim().toLowerCase(),
-            options: { emailRedirectTo: confirmUrl },
-          });
-          if (!resendErr) {
-            channelsUsed.push('SUPABASE_AUTH_RESEND');
-          } else {
-            errors.push(`Supabase Resend: ${resendErr.message}`);
-          }
-        } else {
-          errors.push(`Supabase Auth: ${signUpError.message}`);
-        }
-      }
-    } catch (err: any) {
-      errors.push(`Supabase Auth Exception: ${err.message || err}`);
-    }
-  }
+  const smtpResult = await sendSmtpEmail(
+    smtpConfig,
+    params.email,
+    'Welcome to Allo Halal! Your Account is Ready',
+    html
+  );
 
   return {
-    emailSent: channelsUsed.length > 0,
-    channel: channelsUsed.join(' + ') || 'NONE',
-    details: errors.length > 0 ? errors.join(' | ') : undefined,
+    emailSent: smtpResult.success,
+    channel: smtpResult.success ? 'GMAIL_SMTP' : 'NONE',
+    details: smtpResult.error,
   };
 }

@@ -139,9 +139,12 @@ export async function POST(req: NextRequest) {
       ? settings?.vision_model || 'llama-3.2-11b-vision-preview'
       : settings?.model || 'llama-3.3-70b-versatile';
 
-    let prompt = `Analyze the provided product and its ingredients for Halal compliance based on universally accepted Islamic Dietary Laws (Shari'ah). YOU MUST PROVIDE ALL REASONS AND SUMMARIES IN ${language}.
-
-*** CRITICAL VALIDATION RULE (MUST CHECK FIRST) ***
+    const isCommercialProduct = Boolean(barcode || productName);
+    const validationBlock = isCommercialProduct || Boolean(imageBase64)
+      ? `*** COMMERCIAL PRODUCT CONTEXT ***
+This is a recognized packaged market product (Barcode: "${barcode}", Product: "${productName}", Brand: "${brand}").
+Evaluate all known ingredients and additives. If the ingredient list is partial or in summary form, use your knowledge base of commercial formulations for this product brand to identify potential animal derivatives, gelatin, emulsifiers (E471), or alcohol. Do NOT return "not_food".`
+      : `*** CRITICAL VALIDATION RULE (MUST CHECK FIRST) ***
 Before analyzing, you MUST first determine if the provided text actually contains real food/beverage ingredients.
 If the input is ANY of the following, you MUST return the "not_food" response shown below:
 - Random words, greetings, or single non-ingredient words (e.g. "hi", "hello", "test")
@@ -158,7 +161,11 @@ If the input is ANY of the following, you MUST return the "not_food" response sh
 }
 
 Only proceed with halal analysis if the text genuinely contains food ingredient names.
-*** END VALIDATION RULE ***
+*** END VALIDATION RULE ***`;
+
+    let prompt = `Analyze the provided product and its ingredients for Halal compliance based on universally accepted Islamic Dietary Laws (Shari'ah). YOU MUST PROVIDE ALL REASONS AND SUMMARIES IN ${language}.
+
+${validationBlock}
 
 Product: "${productName}"
 Ingredients: "${ingredientsText}"

@@ -13,11 +13,12 @@ import {
   UserCog,
   Radio,
   Bell,
+  FileText,
 } from 'lucide-react';
 
 import { APP_COLORS } from '@/lib/colors';
 
-export type NavTab = 'dashboard' | 'products' | 'additives' | 'users' | 'admins' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
+export type NavTab = 'dashboard' | 'products' | 'additives' | 'cms' | 'users' | 'admins' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -49,6 +50,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       label: 'Additives',
       sublabel: 'E-Numbers',
       icon: BookOpenCheck,
+    },
+    {
+      id: 'cms' as NavTab,
+      label: 'Legal & App CMS',
+      sublabel: 'GDPR, Help & UI',
+      icon: FileText,
     },
     {
       id: 'notifications' as NavTab,

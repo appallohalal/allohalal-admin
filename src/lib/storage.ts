@@ -1,6 +1,6 @@
 'use client';
 
-import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, PushNotification, NotificationSettings } from './types';
+import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, PushNotification, NotificationSettings, CmsSettings, CmsTexts } from './types';
 import { supabase } from './supabase';
 
 const STORAGE_KEYS = {
@@ -14,6 +14,7 @@ const STORAGE_KEYS = {
   AUTH_SETTINGS: 'halallens_supabase_auth_settings',
   NOTIFICATIONS: 'halallens_supabase_notifications',
   NOTIFICATION_SETTINGS: 'halallens_supabase_notification_settings',
+  CMS_SETTINGS: 'halallens_supabase_cms_settings',
 };
 
 // ==========================================
@@ -311,6 +312,16 @@ export const toggleUserPremium = async (userId: string): Promise<UserAccount[]> 
     } catch (err) {
       console.warn('Supabase toggle premium note:', err);
     }
+  }
+
+  return fetchUsers();
+};
+
+export const deleteUserAccount = async (userId: string): Promise<UserAccount[]> => {
+  try {
+    await supabase.from('users').delete().eq('id', userId);
+  } catch (err) {
+    console.warn('Supabase delete user note:', err);
   }
 
   return fetchUsers();
@@ -747,8 +758,8 @@ export const DEFAULT_AUTH_SETTINGS: AuthSettings = {
   allowGuestScan: true,
   requireEmailVerification: false,
   sendWelcomeEmail: true,
-  emailProvider: 'BOTH',
-  smtpHost: '',
+  emailProvider: 'SMTP',
+  smtpHost: 'smtp.gmail.com',
   smtpPort: 587,
   smtpUser: '',
   smtpPass: '',
@@ -773,12 +784,12 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
         allowGuestScan: data.allow_guest_scan !== false,
         requireEmailVerification: data.require_email_verification === true,
         sendWelcomeEmail: data.send_welcome_email !== false,
-        emailProvider: (data.email_provider || 'BOTH').toUpperCase() as any,
-        smtpHost: data.smtp_host || '',
+        emailProvider: 'SMTP',
+        smtpHost: data.smtp_host || 'smtp.gmail.com',
         smtpPort: Number(data.smtp_port || 587),
         smtpUser: data.smtp_user || '',
         smtpPass: data.smtp_pass || '',
-        smtpFromEmail: data.smtp_from_email || '',
+        smtpFromEmail: data.smtp_from_email || data.smtp_user || '',
         smtpFromName: data.smtp_from_name || 'Allo Halal',
         updatedAt: data.updated_at || new Date().toISOString(),
         updatedBy: data.updated_by || 'Admin',
@@ -994,4 +1005,146 @@ export const sendPushNotification = async (payload: {
 
   return data.notification;
 };
+
+// ==========================================
+// 9. DYNAMIC UI TEXT / CMS SETTINGS (Supabase integration)
+// ==========================================
+
+export const DEFAULT_CMS_TEXTS: CmsTexts = {
+  appName: 'Allo Halal',
+  splashSubtitle: 'Vérification Halal IA Instantanée',
+  heroSubtitle: "Scannez n'importe quel code-barres ou\nétiquette pour vérifier le statut Halal.",
+  scanBarcodeBtn: 'Scanner un Code',
+  analyzeTextBtn: 'Scanner Ingrédients',
+  manualEntryBtn: 'Ou entrer manuellement',
+
+  feature1Title: 'Scanner Code-barres',
+  feature1Desc: 'Pointez votre caméra pour vérifier instantanément',
+  feature2Title: 'Scanner Ingrédients',
+  feature2Desc: 'Prenez une photo pour une analyse approfondie',
+  feature3Title: 'Résultats IA instantanés',
+  feature3Desc: 'Obtenez un statut Halal clair avec des explications',
+
+  onboarding1Title: 'Scan instantané',
+  onboarding1Desc: "Pointez votre caméra vers n'importe quel code-barres alimentaire pour obtenir sa liste d'ingrédients et son statut halal.",
+  onboarding2Title: 'Scanner les ingrédients',
+  onboarding2Desc: "Pas de code-barres ? Prenez l'étiquette en photo et laissez l'IA l'analyser instantanément dans votre langue.",
+  onboarding3Title: 'Analyse experte IA',
+  onboarding3Desc: 'Propulsé par Groq AI, notre système détecte les dérivés animaux cachés et les additifs E douteux en quelques secondes.',
+  onboarding4Title: 'Base de données mondiale',
+  onboarding4Desc: 'Soutenu par Open Food Facts, vous donnant accès à la vérification halal pour des millions de produits dans le monde.',
+
+  loginTitle: 'Bon retour',
+  loginSubtitle: 'Connectez-vous à votre compte pour synchroniser votre historique et vos préférences.',
+  registerTitle: 'Créer votre compte',
+  registerSubtitle: 'Inscrivez-vous pour sauvegarder vos scans, synchroniser votre historique et vérifier les produits Halal partout.',
+  textScanTitle: "Analyse d'Image",
+  textScanSubtitle: "Analysez les ingrédients directement à partir des étiquettes grâce à l'IA Vision.",
+  resultDisclaimer: "Cette analyse est générée par l'IA à titre indicatif. Vérifiez toujours auprès des organismes de certification halal agréés.",
+
+  aboutTitle: "À propos d'Allo Halal",
+  aboutContent:
+    "Allo Halal est un assistant de vérification Halal de nouvelle génération propulsé par l'intelligence artificielle, spécialement conçu pour les consommateurs musulmans exigeants.\n\nÀ l'ère de chaînes agroalimentaires mondialisées et de listes d'ingrédients de plus en plus complexes (additifs E, dérivés animaux cachés, gélatines, arômes), vérifier la conformité halal d'un aliment peut s'avérer fastidieux. Allo Halal combine une IA de pointe et une immense base de données mondiale pour vous apporter une réponse claire, instantanée et sourcée.\n\nFonctionnalités clés :\n• Analyse IA Avancée : Utilisation des derniers modèles Llama 3 Vision de Groq AI pour décrypter les étiquettes alimentaires en temps réel.\n• Base de Données Mondiale : Accès à plus de 3 millions de produits certifiés et analysés grâce à Open Food Facts et nos partenaires.\n• Dictionnaire des Additifs (E-Numbers) : Explications détaillées sur plus de 500 additifs avec avis des écoles juridiques islamiques (Halal, Haram, Mushbooh).\n• Scanner Vision OCR : Prenez en photo n'importe quelle liste d'ingrédients en magasin ; l'IA la traduit et identifie les composants suspects en quelques millisecondes.\n• 100 % Respectueux de votre Vie Privée : Architecture Privacy-First, stricte conformité RGPD européenne.\n\nNotre mission : Vous offrir transparence, sérénité et autonomie dans vos choix alimentaires quotidiens.",
+  helpTitle: 'Aide et support',
+  helpContent:
+    "Besoin d'aide ou des suggestions ? L'équipe Allo Halal s'engage à vous offrir la meilleure expérience.\n\nSujets d'assistance courants :\n• Signaler des résultats incorrects : L'IA peut parfois se tromper. Si vous remarquez un statut erroné pour un produit, transmettez-nous le code-barres et la photo de l'étiquette par e-mail.\n• Produit introuvable : Si le produit n'est pas encore répertorié dans la base, utilisez la fonction 'Scanner Ingrédients' pour analyser directement la liste des ingrédients grâce à l'IA Vision.\n• Problèmes de connexion ou lenteurs : Vérifiez votre accès internet. Les analyses d'ingrédients avancées sont traitées instantanément via nos serveurs cloud sécurisés.\n• Gestion du compte et des données : Pour modifier vos informations de profil ou demander la suppression de votre compte (conformité RGPD), envoyez un message à notre support.\n\nNous contacter :\n• E-mail d'assistance : support@allohalal.fr\n• Site officiel : www.allohalal.fr\n• Centre d'aide & FAQ : allohalal.fr/faq\n\nNotre équipe d'assistance répond généralement dans un délai de 24 à 48 heures ouvrées. Vos retours nous aident à améliorer Allo Halal pour toute la communauté !",
+  privacyTitle: 'Politique de confidentialité (RGPD)',
+  privacyContent:
+    "Dernière mise à jour : Octobre 2026\nConforme au Règlement Général sur la Protection des Données (RGPD - Règlement UE 2016/679)\n\n1. Responsable du Traitement\nL'application Allo Halal est éditée par Allo Halal. Nous accordons une importance primordiale à la confidentialité et à la sécurité de vos données personnelles.\nPour toute question relative à la protection de vos données ou pour contacter notre Délégué à la Protection des Données (DPO) :\n• E-mail : support@allohalal.fr\n• Site officiel : www.allohalal.fr\n\n2. Données Personnelles Collectées\nNous collectons uniquement les informations strictement nécessaires aux fonctionnalités de l'application :\n• Données de compte : Nom complet, nom d'utilisateur, adresse e-mail, pays et ville renseignés lors de l'inscription.\n• Données d'utilisation : Historique des produits scannés et liste de favoris (conservés localement et synchronisés de manière chiffrée si vous êtes connecté).\n• Données techniques : Modèle d'appareil, version du système d'exploitation et identifiant anonymisé de diagnostic.\n• Accès Caméra : Sollicité uniquement pour le scan de codes-barres ou la prise de photo des étiquettes d'ingrédients. Les images envoyées à notre IA Vision pour analyse ne sont jamais conservées de manière permanente sur nos serveurs.\n\n3. Finalités et Bases Légales du Traitement (Art. 6 RGPD)\n• Fourniture du service d'analyse d'ingrédients et gestion de votre compte (Art. 6.1.b - Exécution contractuelle).\n• Notifications d'alertes alimentaires ou mises à jour importantes (Art. 6.1.a - Consentement).\n• Sécurisation des accès et prévention des abus (Art. 6.1.f - Intérêt légitime).\n\n4. Confidentialité et Destinataires des Données\n• Vos données personnelles ne sont JAMAIS vendues, louées ou partagées avec des régies publicitaires tierces.\n• Toutes les communications sont chiffrées selon le protocole TLS 1.3 / SSL via des serveurs sécurisés situés dans l'Union Européenne.\n\n5. Durée de Conservation\n• Les données de votre profil sont conservées tant que votre compte reste actif. Vous pouvez à tout moment demander leur effacement total.\n• L'historique local peut être purgé immédiatement depuis les paramètres de votre application.\n\n6. Vos Droits sous le RGPD (Articles 15 à 22)\nConformément au RGPD et à la loi Informatique et Libertés, vous disposez des droits suivants :\n• Droit d'accès et d'information (Art. 15)\n• Droit de rectification (Art. 16)\n• Droit à l'effacement / « Droit à l'oubli » (Art. 17)\n• Droit à la limitation du traitement (Art. 18)\n• Droit à la portabilité de vos données (Art. 20)\n• Droit d'opposition (Art. 21)\n\nPour exercer vos droits, écrivez simplement à : support@allohalal.fr. Nous vous répondrons dans un délai maximal de 30 jours.\n\n7. Réclamation auprès de l'Autorité de Contrôle (CNIL)\nSi vous estimez, après nous avoir contactés, que vos droits ne sont pas respectés, vous pouvez adresser une réclamation auprès de la CNIL (Commission Nationale de l'Informatique et des Libertés - France : www.cnil.fr).",
+  termsTitle: "Conditions Générales d'Utilisation",
+  termsContent:
+    "Conditions Générales d'Utilisation (CGU)\nDernière mise à jour : Octobre 2026\n\n1. Objet et Acceptation\nLes présentes Conditions Générales d'Utilisation régissent l'accès et l'utilisation de l'application mobile Allo Halal. L'utilisation de l'application implique l'acceptation sans réserve des présentes conditions.\n\n2. Nature Indicative des Analyses IA\nL'application fournit des analyses de statut Halal basées sur la reconnaissance automatique d'images (OCR) et des modèles d'intelligence artificielle. Ces analyses sont fournies à titre purement indicatif et consultatif. Bien que nous nous efforcions d'assurer une exactitude maximale, l'utilisateur est invité à vérifier directement les étiquettes et à se référer aux organismes officiels de certification halal en cas de doute.\n\n3. Propriété Intellectuelle\nTous les contenus, logos, graphismes et logiciels composant Allo Halal sont la propriété exclusive d'Allo Halal et sont protégés par les lois internationales sur la propriété intellectuelle.\n\n4. Comportement des Utilisateurs\nL'utilisateur s'engage à utiliser l'application dans le respect des lois en vigueur et à ne pas tenter de perturber le fonctionnement des serveurs ou d'extraire des données de manière automatisée.\n\n5. Mises à Jour en Temps Réel\nAllo Halal se réserve le droit de modifier les présentes CGU à tout moment. Toute modification est immédiatement synchronisée dans l'application via notre système CMS.\n\nContact légal : support@allohalal.fr",
+  geoAdsNoticeText: 'Offres et promotions Halal à proximité de vous',
+};
+
+export const DEFAULT_CMS_SETTINGS: CmsSettings = {
+  id: 'global',
+  texts: DEFAULT_CMS_TEXTS,
+  translations: {},
+  updatedAt: new Date().toISOString(),
+  updatedBy: 'Admin',
+};
+
+export const fetchCmsSettings = async (): Promise<CmsSettings> => {
+  try {
+    const { data, error } = await supabase
+      .from('cms_settings')
+      .select('*')
+      .eq('id', 'global')
+      .maybeSingle();
+
+    if (!error && data) {
+      const mapped: CmsSettings = {
+        id: data.id || 'global',
+        texts: {
+          ...DEFAULT_CMS_TEXTS,
+          ...(data.texts || {}),
+        },
+        translations: data.translations || {},
+        updatedAt: data.updated_at || new Date().toISOString(),
+        updatedBy: data.updated_by || 'Admin',
+      };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.CMS_SETTINGS, JSON.stringify(mapped));
+      }
+      return mapped;
+    }
+  } catch (err) {
+    console.warn('Supabase fetch CMS settings note:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(STORAGE_KEYS.CMS_SETTINGS);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        return {
+          ...DEFAULT_CMS_SETTINGS,
+          ...parsed,
+          texts: {
+            ...DEFAULT_CMS_TEXTS,
+            ...(parsed.texts || {}),
+          },
+        };
+      } catch (_) {}
+    }
+  }
+
+  return DEFAULT_CMS_SETTINGS;
+};
+
+export const saveCmsSettings = async (
+  settings: CmsSettings,
+  updatedBy: string = 'Admin'
+): Promise<CmsSettings> => {
+  const payload = {
+    id: 'global',
+    texts: settings.texts,
+    translations: settings.translations || {},
+    updated_at: new Date().toISOString(),
+    updated_by: updatedBy,
+  };
+
+  try {
+    const { error } = await supabase.from('cms_settings').upsert(payload);
+    if (error) {
+      console.error('Error saving CMS settings to Supabase:', error);
+      throw error;
+    }
+  } catch (err) {
+    console.warn('Supabase save CMS settings warning:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const updated: CmsSettings = {
+      ...settings,
+      updatedAt: payload.updated_at,
+      updatedBy,
+    };
+    localStorage.setItem(STORAGE_KEYS.CMS_SETTINGS, JSON.stringify(updated));
+  }
+
+  return fetchCmsSettings();
+};
+
 
