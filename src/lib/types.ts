@@ -171,6 +171,14 @@ export interface AuthSettings {
   forceUserAuth: boolean;
   allowGuestScan: boolean;
   requireEmailVerification?: boolean;
+  sendWelcomeEmail?: boolean;
+  emailProvider?: 'SUPABASE' | 'SMTP' | 'BOTH';
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUser?: string;
+  smtpPass?: string;
+  smtpFromEmail?: string;
+  smtpFromName?: string;
   updatedAt: string;
   updatedBy: string;
 }

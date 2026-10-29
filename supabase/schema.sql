@@ -175,7 +175,7 @@ AS $$
 DECLARE
   v_count int;
 BEGIN
-  SELECT count(*) INTO v_count FROM auth.users;
+  SELECT count(*) INTO v_count FROM auth.users WHERE COALESCE(raw_user_meta_data->>'account_type', 'admin') != 'mobile_user';
   RETURN json_build_object(
     'is_first_user', (v_count = 0),
     'user_count', v_count
@@ -427,6 +427,14 @@ CREATE TABLE IF NOT EXISTS public.auth_settings (
   force_user_auth BOOLEAN DEFAULT FALSE,
   allow_guest_scan BOOLEAN DEFAULT TRUE,
   require_email_verification BOOLEAN DEFAULT FALSE,
+  send_welcome_email BOOLEAN DEFAULT TRUE,
+  email_provider VARCHAR(32) DEFAULT 'BOTH',
+  smtp_host VARCHAR(255) DEFAULT '',
+  smtp_port INTEGER DEFAULT 587,
+  smtp_user VARCHAR(255) DEFAULT '',
+  smtp_pass TEXT DEFAULT '',
+  smtp_from_email VARCHAR(255) DEFAULT '',
+  smtp_from_name VARCHAR(255) DEFAULT 'Allo Halal',
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   updated_by VARCHAR(128) DEFAULT 'Admin'
 );

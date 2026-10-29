@@ -102,6 +102,14 @@ export const loginAdmin = async (
       return { success: false, error: 'No user returned from Supabase.' };
     }
 
+    if (data.user.user_metadata?.account_type === 'mobile_user') {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        error: 'This account is registered for the Mobile App only, not the Admin Panel.',
+      };
+    }
+
     return {
       success: true,
       user: formatSupabaseUser(data.user),

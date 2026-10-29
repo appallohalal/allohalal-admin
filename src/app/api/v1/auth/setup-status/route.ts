@@ -19,7 +19,9 @@ export async function GET() {
     if (!dbPool) {
       return NextResponse.json({ isFirstUser: false, userCount: 1 });
     }
-    const res = await dbPool.query('SELECT count(*)::int as count FROM auth.users');
+    const res = await dbPool.query(
+      "SELECT count(*)::int as count FROM auth.users WHERE COALESCE(raw_user_meta_data->>'account_type', 'admin') != 'mobile_user'"
+    );
     const userCount = res.rows[0]?.count || 0;
     return NextResponse.json({
       isFirstUser: userCount === 0,

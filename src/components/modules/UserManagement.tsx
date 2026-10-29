@@ -19,6 +19,10 @@ import {
   ChevronRight,
   Mail,
   ShieldAlert,
+  Server,
+  Save,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface UserManagementProps {
@@ -42,6 +46,8 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 }) => {
   const [form, setForm] = useState<AuthSettings>(initialSettings || DEFAULT_AUTH_SETTINGS);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSmtpSettings, setShowSmtpSettings] = useState(false);
+  const [showSmtpPass, setShowSmtpPass] = useState(false);
 
   // Users table state
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BANNED' | 'PREMIUM'>('ALL');
@@ -89,6 +95,60 @@ export const UserManagement: React.FC<UserManagementProps> = ({
       // Revert on error
       setForm((p) => ({ ...p, forceUserAuth: !nextState }));
       toast.error(err.message || 'Failed to update policy.', 'Update Error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleToggleWelcomeEmail = async () => {
+    if (!onSaveAuthSettings || isSaving) return;
+    const nextState = !(form.sendWelcomeEmail !== false);
+    setIsSaving(true);
+
+    const updatedPayload: AuthSettings = {
+      ...form,
+      id: 'global',
+      sendWelcomeEmail: nextState,
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentAdminName,
+    };
+
+    setForm(updatedPayload);
+
+    try {
+      await onSaveAuthSettings(updatedPayload);
+      toast.success(
+        nextState
+          ? 'Registration Welcome/Confirmation Emails are now ENABLED.'
+          : 'Registration Welcome/Confirmation Emails are now DISABLED.',
+        'Email Notification Updated'
+      );
+    } catch (err: any) {
+      setForm((p) => ({ ...p, sendWelcomeEmail: !nextState }));
+      toast.error(err.message || 'Failed to update email settings.', 'Update Error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveEmailSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onSaveAuthSettings || isSaving) return;
+    setIsSaving(true);
+
+    const updatedPayload: AuthSettings = {
+      ...form,
+      id: 'global',
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentAdminName,
+    };
+
+    try {
+      await onSaveAuthSettings(updatedPayload);
+      toast.success('Registration Email & SMTP settings saved successfully.', 'Settings Saved');
+      setShowSmtpSettings(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save SMTP settings.', 'Save Error');
     } finally {
       setIsSaving(false);
     }
@@ -205,7 +265,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
           aria-checked={form.forceUserAuth}
           onClick={handleToggle}
           disabled={isSaving}
-          className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50 ${
+          className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#088839]/20 disabled:opacity-50 ${
             form.forceUserAuth ? c.primaryBg : 'bg-slate-200'
           }`}
         >
@@ -217,6 +277,187 @@ export const UserManagement: React.FC<UserManagementProps> = ({
             }`}
           />
         </button>
+      </div>
+
+      {/* 1.5. Registration Email Notifications (Supabase / SMTP) */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
+                form.sendWelcomeEmail !== false
+                  ? `${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder} border shadow-xs`
+                  : 'bg-slate-100 text-slate-400 border border-slate-200'
+              }`}
+            >
+              <Mail className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                  Registration Email Notifications
+                </h2>
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border transition-colors ${
+                    form.sendWelcomeEmail !== false
+                      ? `${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`
+                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {form.sendWelcomeEmail !== false ? 'Active' : 'Disabled'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                Automatically send transactional welcome &amp; confirmation emails upon new user registration (via Supabase Auth or Custom SMTP)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowSmtpSettings(!showSmtpSettings)}
+              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Server className="w-3.5 h-3.5 text-[#088839]" />
+              <span>{showSmtpSettings ? 'Hide SMTP Settings' : 'Configure SMTP / Provider'}</span>
+            </button>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.sendWelcomeEmail !== false}
+              onClick={handleToggleWelcomeEmail}
+              disabled={isSaving}
+              className={`relative inline-flex h-8 w-15 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#088839]/20 disabled:opacity-50 ${
+                form.sendWelcomeEmail !== false ? c.primaryBg : 'bg-slate-200'
+              }`}
+            >
+              <span className="sr-only">Toggle Registration Email</span>
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                  form.sendWelcomeEmail !== false ? 'translate-x-7' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+
+        {showSmtpSettings && (
+          <form onSubmit={handleSaveEmailSettings} className="pt-4 border-t border-slate-100 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Email Delivery Channel
+                </label>
+                <select
+                  value={form.emailProvider || 'BOTH'}
+                  onChange={(e) => setForm((p) => ({ ...p, emailProvider: e.target.value as any }))}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white ${c.primaryFocus} cursor-pointer`}
+                >
+                  <option value="BOTH">Supabase Auth + Custom SMTP (Recommended)</option>
+                  <option value="SUPABASE">Supabase Auth Only</option>
+                  <option value="SMTP">Custom SMTP Server Only</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  SMTP Host
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. smtp.gmail.com or smtp.hostinger.com"
+                  value={form.smtpHost || ''}
+                  onChange={(e) => setForm((p) => ({ ...p, smtpHost: e.target.value }))}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  SMTP Port
+                </label>
+                <input
+                  type="number"
+                  placeholder="587 or 465"
+                  value={form.smtpPort || 587}
+                  onChange={(e) => setForm((p) => ({ ...p, smtpPort: Number(e.target.value) }))}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  SMTP Username / Email
+                </label>
+                <input
+                  type="text"
+                  placeholder="noreply@yourdomain.com"
+                  value={form.smtpUser || ''}
+                  onChange={(e) => setForm((p) => ({ ...p, smtpUser: e.target.value }))}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  SMTP Password / App Password
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type={showSmtpPass ? 'text' : 'password'}
+                    placeholder="••••••••••••"
+                    value={form.smtpPass || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, smtpPass: e.target.value }))}
+                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 pr-9 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSmtpPass(!showSmtpPass)}
+                    className="absolute right-2.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                  >
+                    {showSmtpPass ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Sender Display Name &amp; From Email
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Allo Halal"
+                    value={form.smtpFromName || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, smtpFromName: e.target.value }))}
+                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
+                  />
+                  <input
+                    type="email"
+                    placeholder="From Email (optional)"
+                    value={form.smtpFromEmail || ''}
+                    onChange={(e) => setForm((p) => ({ ...p, smtpFromEmail: e.target.value }))}
+                    className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 focus:bg-white ${c.primaryFocus}`}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className={`px-5 py-2 rounded-xl ${c.primaryBg} ${c.primaryBgHover} text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50`}
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{isSaving ? 'Saving...' : 'Save Email Settings'}</span>
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* 2. Registered App Users List (Clean project pattern) */}

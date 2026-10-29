@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { sendRegistrationWelcomeEmail } from '@/lib/email';
 import crypto from 'crypto';
 
 function hashPassword(password: string): string {
@@ -100,9 +101,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Trigger transactional Welcome / Confirmation Email via Supabase Auth &/or SMTP
+    const originUrl = new URL(req.url).origin;
+    const emailResult = await sendRegistrationWelcomeEmail({
+      name: insertedUser.name,
+      username: insertedUser.username,
+      email: insertedUser.email,
+      password,
+      country: insertedUser.country,
+      city: insertedUser.city,
+      originUrl,
+    });
+
     return NextResponse.json({
       success: true,
-      message: 'Account created successfully!',
+      message: emailResult.emailSent
+        ? `Account created successfully! A confirmation email has been sent to ${insertedUser.email}.`
+        : 'Account created successfully!',
+      emailSent: emailResult.emailSent,
+      emailChannel: emailResult.channel,
       user: {
         id: insertedUser.id,
         name: insertedUser.name,

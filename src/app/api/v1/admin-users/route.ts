@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
 import { supabase } from '@/lib/supabase';
+import { sendRegistrationWelcomeEmail } from '@/lib/email';
 
 let pool: Pool | null = null;
 
@@ -31,6 +32,7 @@ export async function GET() {
         created_at,
         last_sign_in_at
       FROM auth.users
+      WHERE COALESCE(raw_user_meta_data->>'account_type', 'admin') != 'mobile_user'
       ORDER BY created_at ASC;
     `);
 
@@ -85,6 +87,7 @@ export async function POST(req: NextRequest) {
         data: {
           name: name.trim(),
           role: assignedRole,
+          account_type: 'admin',
         },
       },
     });
@@ -106,6 +109,20 @@ export async function POST(req: NextRequest) {
         WHERE email = $3;
       `, [assignedRole, name.trim(), email.trim().toLowerCase()]);
     }
+
+    // 3. Send transactional welcome email if SMTP is configured
+    try {
+      const originUrl = new URL(req.url).origin;
+      await sendRegistrationWelcomeEmail({
+        name: name.trim(),
+        username: name.trim().toLowerCase().replace(/\s+/g, '.'),
+        email: email.trim().toLowerCase(),
+        password,
+        country: assignedRole,
+        city: 'Admin Panel',
+        originUrl,
+      });
+    } catch (_) {}
 
     return NextResponse.json({
       success: true,
