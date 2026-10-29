@@ -73,9 +73,9 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc');
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
-  // Pagination
+  // Pagination: Show the latest 10 records per page
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+  const itemsPerPage = 10;
 
   // Actions State
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<Contribution | null>(null);
