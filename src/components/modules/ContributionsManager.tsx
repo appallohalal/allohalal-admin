@@ -1327,25 +1327,18 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                 <div className="space-y-5">
                   {/* Stripe Master Switch & Environment */}
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
-                          <CreditCard className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
-                            Stripe Payment Processing
-                          </div>
-                          <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                            Accept debit/credit cards, Apple Pay, and Google Pay for free-will contributions
-                          </p>
-                        </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
+                        <CreditCard className="w-5 h-5" />
                       </div>
-
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        Enabled
-                      </span>
+                      <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
+                          Stripe Payment Processing
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                          Accept debit/credit cards, Apple Pay, and Google Pay for free-will contributions
+                        </p>
+                      </div>
                     </div>
 
                     {/* Environment Selector: Test Mode vs Live Production */}
