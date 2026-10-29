@@ -1337,23 +1337,10 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={enableStripe}
-                        onClick={() => setEnableStripe(!enableStripe)}
-                        className={`relative inline-flex h-7 w-13 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-500/20 ${
-                          enableStripe ? 'bg-indigo-600' : 'bg-slate-200'
-                        }`}
-                      >
-                        <span className="sr-only">Toggle Stripe</span>
-                        <span
-                          aria-hidden="true"
-                          className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                            enableStripe ? 'translate-x-6' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Enabled
+                      </span>
                     </div>
 
                     {/* Environment Selector: Test Mode vs Live Production */}
