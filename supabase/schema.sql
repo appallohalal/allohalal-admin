@@ -426,6 +426,7 @@ CREATE TABLE IF NOT EXISTS public.auth_settings (
   id VARCHAR(64) PRIMARY KEY DEFAULT 'global',
   force_user_auth BOOLEAN DEFAULT FALSE,
   allow_guest_scan BOOLEAN DEFAULT TRUE,
+  enable_contributions BOOLEAN DEFAULT TRUE,
   require_email_verification BOOLEAN DEFAULT FALSE,
   send_welcome_email BOOLEAN DEFAULT TRUE,
   email_provider VARCHAR(32) DEFAULT 'BOTH',
@@ -435,9 +436,64 @@ CREATE TABLE IF NOT EXISTS public.auth_settings (
   smtp_pass TEXT DEFAULT '',
   smtp_from_email VARCHAR(255) DEFAULT '',
   smtp_from_name VARCHAR(255) DEFAULT 'Allo Halal',
+  welcome_email_subject TEXT DEFAULT 'Welcome to Allo Halal! Your Account is Ready',
+  welcome_email_title TEXT DEFAULT 'Welcome to Allo Halal!',
+  welcome_email_subtitle TEXT DEFAULT 'Your trusted AI-powered companion for verifying Halal products & ingredients',
+  welcome_email_body TEXT DEFAULT '',
+  confirmation_email_subject TEXT DEFAULT 'Confirm Your Allo Halal Account',
+  confirmation_email_title TEXT DEFAULT 'Verify Your Email Address',
+  confirmation_email_subtitle TEXT DEFAULT 'Please verify your email address to secure and activate your account',
+  confirmation_email_body TEXT DEFAULT '',
+  contribution_presets JSONB DEFAULT '[1, 3, 5, 10, 15]'::jsonb,
+  default_contribution_amount NUMERIC(10, 2) DEFAULT 5.00,
+  min_contribution_amount NUMERIC(10, 2) DEFAULT 1.00,
+  max_contribution_amount NUMERIC(10, 2) DEFAULT 50.00,
+  contribution_currency VARCHAR(16) DEFAULT 'EUR',
+  coffee_max_amount NUMERIC(10, 2) DEFAULT 2.00,
+  server_max_amount NUMERIC(10, 2) DEFAULT 4.00,
+  growth_max_amount NUMERIC(10, 2) DEFAULT 9.00,
+  enable_humanitarian_commitment BOOLEAN DEFAULT TRUE,
+  humanitarian_title TEXT DEFAULT 'Humanitarian Commitment & Solidarity',
+  humanitarian_badge TEXT DEFAULT 'Charity Redistribution Partner',
+  humanitarian_charity_share TEXT DEFAULT '20% Redistributed to Charity',
+  humanitarian_text TEXT DEFAULT 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.',
+  humanitarian_organization_name TEXT DEFAULT 'Global Halal Emergency Food Relief',
+  humanitarian_learn_more_url TEXT DEFAULT 'https://allohalal.fr/humanitarian',
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   updated_by VARCHAR(128) DEFAULT 'Admin'
 );
+
+-- Migration helpers for existing databases
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS enable_contributions BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS welcome_email_subject TEXT DEFAULT 'Welcome to Allo Halal! Your Account is Ready';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS welcome_email_title TEXT DEFAULT 'Welcome to Allo Halal!';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS welcome_email_subtitle TEXT DEFAULT 'Your trusted AI-powered companion for verifying Halal products & ingredients';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS welcome_email_body TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS confirmation_email_subject TEXT DEFAULT 'Confirm Your Allo Halal Account';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS confirmation_email_title TEXT DEFAULT 'Verify Your Email Address';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS confirmation_email_subtitle TEXT DEFAULT 'Please verify your email address to secure and activate your account';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS confirmation_email_body TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS contribution_presets JSONB DEFAULT '[1, 3, 5, 10, 15]'::jsonb;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS default_contribution_amount NUMERIC(10, 2) DEFAULT 5.00;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS min_contribution_amount NUMERIC(10, 2) DEFAULT 1.00;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS max_contribution_amount NUMERIC(10, 2) DEFAULT 50.00;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS contribution_currency VARCHAR(16) DEFAULT 'EUR';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS coffee_max_amount NUMERIC(10, 2) DEFAULT 2.00;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS server_max_amount NUMERIC(10, 2) DEFAULT 4.00;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS growth_max_amount NUMERIC(10, 2) DEFAULT 9.00;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS enable_humanitarian_commitment BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_title TEXT DEFAULT 'Humanitarian Commitment & Solidarity';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_badge TEXT DEFAULT 'Charity Redistribution Partner';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_charity_share TEXT DEFAULT '20% Redistributed to Charity';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_text TEXT DEFAULT 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_organization_name TEXT DEFAULT 'Global Halal Emergency Food Relief';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_learn_more_url TEXT DEFAULT 'https://allohalal.fr/humanitarian';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS enable_stripe BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_mode VARCHAR(16) DEFAULT 'test';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_publishable_key TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_secret_key TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_webhook_secret TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_currency VARCHAR(8) DEFAULT 'eur';
 
 ALTER TABLE public.auth_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for auth_settings" ON public.auth_settings;
@@ -465,6 +521,46 @@ CREATE POLICY "Allow all for cms_settings" ON public.cms_settings FOR ALL USING 
 INSERT INTO public.cms_settings (id, texts, translations)
 VALUES ('global', '{}'::jsonb, '{}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
+
+-- ==============================================================================
+-- 15. Community Donations & Free-Will Contributions ("Prix Libre") Table
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.contributions (
+  id VARCHAR(64) PRIMARY KEY,
+  donor_name VARCHAR(255) NOT NULL,
+  donor_email VARCHAR(255),
+  donor_location VARCHAR(255),
+  amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+  currency VARCHAR(16) DEFAULT 'EUR',
+  tier VARCHAR(32) DEFAULT 'SERVER', -- 'COFFEE', 'SERVER', 'GROWTH', 'PATRON'
+  payment_method VARCHAR(32) DEFAULT 'STRIPE', -- 'STRIPE', 'PAYPAL', 'APPLE_PAY', 'GOOGLE_PAY', 'MANUAL'
+  transaction_id VARCHAR(128),
+  message TEXT,
+  status VARCHAR(32) DEFAULT 'COMPLETED', -- 'COMPLETED', 'PENDING', 'REFUNDED'
+  is_anonymous BOOLEAN DEFAULT FALSE,
+  reviewed_by VARCHAR(128),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Migration helpers for existing database
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS donor_name VARCHAR(255);
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS donor_email VARCHAR(255);
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS donor_location VARCHAR(255);
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS amount NUMERIC(10, 2) DEFAULT 0.00;
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS currency VARCHAR(16) DEFAULT 'EUR';
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS tier VARCHAR(32) DEFAULT 'SERVER';
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS payment_method VARCHAR(32) DEFAULT 'STRIPE';
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(128);
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(128);
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS message TEXT;
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'COMPLETED';
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS is_anonymous BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(128);
+
+ALTER TABLE public.contributions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for contributions" ON public.contributions;
+CREATE POLICY "Allow all for contributions" ON public.contributions FOR ALL USING (true) WITH CHECK (true);
+
 
 
 

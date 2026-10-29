@@ -24,7 +24,9 @@ import {
   Eye,
   EyeOff,
   Trash2,
+  FileEdit,
 } from 'lucide-react';
+import { RegistrationEmailEditor } from './RegistrationEmailEditor';
 
 interface UserManagementProps {
   users?: UserAccount[];
@@ -51,6 +53,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [showSmtpSettings, setShowSmtpSettings] = useState(false);
   const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [showEmailEditor, setShowEmailEditor] = useState(false);
 
   // Users table state
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BANNED' | 'PREMIUM'>('ALL');
@@ -323,6 +326,15 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 >
                   <Server className="w-3 h-3 text-[#088839]" />
                   <span>SMTP</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowEmailEditor(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#e6f4eb] hover:bg-[#d5e8dc] text-[#088839] border border-[#b5e0c5] transition-colors cursor-pointer shadow-2xs"
+                  title="Customize Welcome & Confirmation Email Templates"
+                >
+                  <FileEdit className="w-3 h-3 text-[#088839]" />
+                  <span>Email Editor</span>
                 </button>
               </div>
               <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
@@ -780,22 +792,35 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => setShowSmtpSettings(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer"
+                  onClick={() => {
+                    setShowSmtpSettings(false);
+                    setShowEmailEditor(true);
+                  }}
+                  className="text-[11px] text-[#088839] hover:underline font-bold flex items-center gap-1 cursor-pointer"
                 >
-                  Cancel
+                  <FileEdit className="w-3.5 h-3.5" />
+                  <span>Customize Email Content &rarr;</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className={`px-5 py-2 rounded-xl ${c.primaryBg} ${c.primaryBgHover} text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50`}
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isSaving ? 'Saving...' : 'Save Settings'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSmtpSettings(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className={`px-5 py-2 rounded-xl ${c.primaryBg} ${c.primaryBgHover} text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50`}
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{isSaving ? 'Saving...' : 'Save Settings'}</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -860,6 +885,20 @@ export const UserManagement: React.FC<UserManagementProps> = ({
           </div>
         </div>
       )}
+
+      {/* Registration Email Editor Modal */}
+      <RegistrationEmailEditor
+        isOpen={showEmailEditor}
+        onClose={() => setShowEmailEditor(false)}
+        authSettings={form}
+        onSaveAuthSettings={async (updated) => {
+          setForm(updated);
+          if (onSaveAuthSettings) {
+            await onSaveAuthSettings(updated);
+          }
+        }}
+        currentAdminEmail={form.smtpUser || ''}
+      />
     </div>
   );
 };

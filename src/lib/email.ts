@@ -1,6 +1,15 @@
 import net from 'net';
 import tls from 'tls';
 import { supabase } from './supabase';
+import {
+  WelcomeEmailParams,
+  ConfirmationEmailParams,
+  replaceEmailPlaceholders,
+  buildWelcomeEmailHtml,
+  buildConfirmationEmailHtml,
+} from './email-templates';
+
+export * from './email-templates';
 
 export interface SmtpConfig {
   host: string;
@@ -9,168 +18,6 @@ export interface SmtpConfig {
   pass: string;
   fromEmail: string;
   fromName: string;
-}
-
-export interface WelcomeEmailParams {
-  name: string;
-  username: string;
-  email: string;
-  password?: string;
-  country?: string;
-  city?: string;
-  originUrl?: string;
-}
-
-export function buildWelcomeEmailHtml(params: {
-  name: string;
-  username: string;
-  email: string;
-  country?: string;
-  city?: string;
-  logoUrl?: string;
-}): string {
-  const location = [params.city, params.country].filter(Boolean).join(', ') || 'Global';
-  const joinedDate = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
-  const logoUrl = params.logoUrl || 'https://halallens-admin.vercel.app/logo.png';
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Welcome to Allo Halal</title>
-</head>
-<body style="margin:0;padding:0;background-color:#eef5f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#0f172a;-webkit-font-smoothing:antialiased;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#eef5f0;padding:40px 16px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:580px;background-color:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #d5e8dc;box-shadow:0 16px 40px rgba(8,136,57,0.10);">
-          
-          <!-- Top Brand Banner -->
-          <tr>
-            <td style="background:linear-gradient(135deg,#088839 0%,#055a25 100%);padding:40px 32px 36px;text-align:center;">
-              <img src="${logoUrl}" alt="Allo Halal" width="68" height="68" style="display:block;margin:0 auto 16px;width:68px;height:68px;border-radius:18px;border:2px solid rgba(255,255,255,0.28);background-color:#088839;object-fit:cover;" />
-              <div style="display:inline-block;background-color:rgba(255,255,255,0.16);border:1px solid rgba(255,255,255,0.25);border-radius:999px;padding:5px 14px;margin-bottom:12px;">
-                <span style="color:#ffffff;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">&#10003; Registration Complete</span>
-              </div>
-              <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.3px;line-height:1.25;">
-                Welcome to Allo Halal!
-              </h1>
-              <p style="margin:8px 0 0;color:#d1fae5;font-size:14px;font-weight:500;line-height:1.5;">
-                Your trusted AI-powered companion for verifying Halal products &amp; ingredients
-              </p>
-            </td>
-          </tr>
-
-          <!-- Main Content -->
-          <tr>
-            <td style="padding:36px 32px 28px;">
-              <p style="margin:0 0 12px;font-size:16px;line-height:1.6;color:#0f172a;">
-                Assalamu Alaikum <strong style="color:#088839;">${params.name}</strong>,
-              </p>
-              <p style="margin:0 0 28px;font-size:14px;line-height:1.7;color:#475569;">
-                Thank you for joining the <strong>Allo Halal</strong> community! Your account is now active and ready to use across the mobile app. Here is a summary of your registered profile:
-              </p>
-
-              <!-- Account Details Card -->
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f8fbf9;border:1px solid #d5e8dc;border-radius:18px;overflow:hidden;margin-bottom:28px;">
-                <tr>
-                  <td colspan="2" style="background-color:#e6f4eb;padding:12px 20px;border-bottom:1px solid #cce5d4;">
-                    <span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#066d2e;">
-                      Account Profile Details
-                    </span>
-                  </td>
-                </tr>
-                <tr>
-                  <td style="padding:13px 20px 8px;font-size:13px;color:#64748b;">Full Name</td>
-                  <td style="padding:13px 20px 8px;font-size:13px;font-weight:700;color:#0f172a;text-align:right;">${params.name}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 20px;font-size:13px;color:#64748b;border-top:1px dashed #e2e8f0;">Username</td>
-                  <td style="padding:8px 20px;font-size:13px;font-weight:700;color:#088839;text-align:right;border-top:1px dashed #e2e8f0;">@${params.username}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 20px;font-size:13px;color:#64748b;border-top:1px dashed #e2e8f0;">Email Address</td>
-                  <td style="padding:8px 20px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;border-top:1px dashed #e2e8f0;">${params.email}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 20px;font-size:13px;color:#64748b;border-top:1px dashed #e2e8f0;">Location</td>
-                  <td style="padding:8px 20px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;border-top:1px dashed #e2e8f0;">${location}</td>
-                </tr>
-                <tr>
-                  <td style="padding:8px 20px 14px;font-size:13px;color:#64748b;border-top:1px dashed #e2e8f0;">Joined On</td>
-                  <td style="padding:8px 20px 14px;font-size:13px;font-weight:600;color:#0f172a;text-align:right;border-top:1px dashed #e2e8f0;">${joinedDate}</td>
-                </tr>
-              </table>
-
-              <!-- Key Features Section -->
-              <p style="margin:0 0 14px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:#64748b;">
-                What You Can Do in Allo Halal
-              </p>
-
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:10px;">
-                <tr>
-                  <td style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
-                    <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">
-                      &#128247; Instant Barcode &amp; Product Scanner
-                    </div>
-                    <div style="font-size:12px;color:#64748b;line-height:1.5;">
-                      Scan any food barcode to immediately check its verified Halal, Haram, or Mushbooh status.
-                    </div>
-                  </td>
-                </tr>
-              </table>
-
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:10px;">
-                <tr>
-                  <td style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
-                    <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">
-                      &#10024; AI Ingredient Label Analysis
-                    </div>
-                    <div style="font-size:12px;color:#64748b;line-height:1.5;">
-                      Take a photo of ingredient labels or paste text for instant AI-powered Halal compliance checks.
-                    </div>
-                  </td>
-                </tr>
-              </table>
-
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                <tr>
-                  <td style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
-                    <div style="font-size:13px;font-weight:700;color:#0f172a;margin-bottom:3px;">
-                      &#127760; 14-Language E-Numbers Dictionary
-                    </div>
-                    <div style="font-size:12px;color:#64748b;line-height:1.5;">
-                      Understand food additives and E-Numbers with clear scholarly explanations in your native language.
-                    </div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color:#f8fbf9;border-top:1px solid #e2e8f0;padding:22px 32px;text-align:center;">
-              <p style="margin:0 0 4px;font-size:12px;font-weight:700;color:#088839;">
-                Allo Halal — Smart Halal Scanner
-              </p>
-              <p style="margin:0;font-size:11px;color:#94a3b8;line-height:1.5;">
-                &copy; ${new Date().getFullYear()} Allo Halal. All rights reserved.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
 }
 
 /**
@@ -341,18 +188,20 @@ export async function sendSmtpEmail(
 }
 
 /**
- * Triggers registration welcome email via configured Gmail SMTP.
+ * Helper to retrieve active SMTP configuration and email template texts from auth_settings
  */
-export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): Promise<{
-  emailSent: boolean;
-  channel: string;
-  details?: string;
+export async function getActiveEmailConfig(): Promise<{
+  sendWelcomeEmail: boolean;
+  smtpConfig: SmtpConfig;
+  welcomeSubject: string;
+  welcomeTitle: string;
+  welcomeSubtitle: string;
+  welcomeBody: string;
+  confirmationSubject: string;
+  confirmationTitle: string;
+  confirmationSubtitle: string;
+  confirmationBody: string;
 }> {
-  const baseUrl =
-    params.originUrl ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://halallens-admin.vercel.app';
-
   let sendWelcomeEmail = true;
   let smtpConfig: SmtpConfig = {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -362,6 +211,16 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
     fromEmail: process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || '',
     fromName: process.env.SMTP_FROM_NAME || 'Allo Halal',
   };
+
+  let welcomeSubject = 'Welcome to Allo Halal! Your Account is Ready';
+  let welcomeTitle = 'Welcome to Allo Halal!';
+  let welcomeSubtitle = 'Your trusted AI-powered companion for verifying Halal products & ingredients';
+  let welcomeBody = '';
+
+  let confirmationSubject = 'Confirm Your Allo Halal Account';
+  let confirmationTitle = 'Verify Your Email Address';
+  let confirmationSubtitle = 'Please verify your email address to secure and activate your account';
+  let confirmationBody = '';
 
   try {
     const { data } = await supabase
@@ -378,16 +237,55 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
       if (data.smtp_pass) smtpConfig.pass = String(data.smtp_pass).replace(/\s+/g, '');
       smtpConfig.fromEmail = data.smtp_from_email || data.smtp_user || smtpConfig.fromEmail;
       if (data.smtp_from_name) smtpConfig.fromName = data.smtp_from_name;
+
+      if (data.welcome_email_subject) welcomeSubject = data.welcome_email_subject;
+      if (data.welcome_email_title) welcomeTitle = data.welcome_email_title;
+      if (data.welcome_email_subtitle) welcomeSubtitle = data.welcome_email_subtitle;
+      if (data.welcome_email_body) welcomeBody = data.welcome_email_body;
+
+      if (data.confirmation_email_subject) confirmationSubject = data.confirmation_email_subject;
+      if (data.confirmation_email_title) confirmationTitle = data.confirmation_email_title;
+      if (data.confirmation_email_subtitle) confirmationSubtitle = data.confirmation_email_subtitle;
+      if (data.confirmation_email_body) confirmationBody = data.confirmation_email_body;
     }
   } catch (err) {
     console.warn('Could not load auth_settings for email:', err);
   }
 
-  if (!sendWelcomeEmail) {
+  return {
+    sendWelcomeEmail,
+    smtpConfig,
+    welcomeSubject,
+    welcomeTitle,
+    welcomeSubtitle,
+    welcomeBody,
+    confirmationSubject,
+    confirmationTitle,
+    confirmationSubtitle,
+    confirmationBody,
+  };
+}
+
+/**
+ * Triggers registration welcome email via configured Gmail SMTP using custom admin templates.
+ */
+export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): Promise<{
+  emailSent: boolean;
+  channel: string;
+  details?: string;
+}> {
+  const baseUrl =
+    params.originUrl ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://halallens-admin.vercel.app';
+
+  const cfg = await getActiveEmailConfig();
+
+  if (!cfg.sendWelcomeEmail) {
     return { emailSent: false, channel: 'DISABLED', details: 'Welcome emails are disabled in settings.' };
   }
 
-  const hasSmtpCredentials = Boolean(smtpConfig.host && smtpConfig.user && smtpConfig.pass);
+  const hasSmtpCredentials = Boolean(cfg.smtpConfig.host && cfg.smtpConfig.user && cfg.smtpConfig.pass);
   if (!hasSmtpCredentials) {
     return {
       emailSent: false,
@@ -396,6 +294,11 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
     };
   }
 
+  const subject = params.customSubject || cfg.welcomeSubject;
+  const title = params.customTitle || cfg.welcomeTitle;
+  const subtitle = params.customSubtitle || cfg.welcomeSubtitle;
+  const bodyText = params.customBody || cfg.welcomeBody;
+
   const html = buildWelcomeEmailHtml({
     name: params.name,
     username: params.username,
@@ -403,12 +306,23 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
     country: params.country,
     city: params.city,
     logoUrl: `${baseUrl}/logo.png`,
+    title,
+    subtitle,
+    bodyText,
+  });
+
+  const parsedSubject = replaceEmailPlaceholders(subject, {
+    name: params.name,
+    username: params.username,
+    email: params.email,
+    country: params.country,
+    city: params.city,
   });
 
   const smtpResult = await sendSmtpEmail(
-    smtpConfig,
+    cfg.smtpConfig,
     params.email,
-    'Welcome to Allo Halal! Your Account is Ready',
+    parsedSubject,
     html
   );
 
@@ -417,4 +331,152 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
     channel: smtpResult.success ? 'GMAIL_SMTP' : 'NONE',
     details: smtpResult.error,
   };
+}
+
+/**
+ * Triggers registration confirmation / verification email via configured Gmail SMTP.
+ */
+export async function sendRegistrationConfirmationEmail(params: ConfirmationEmailParams): Promise<{
+  emailSent: boolean;
+  channel: string;
+  details?: string;
+}> {
+  const baseUrl =
+    params.originUrl ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://halallens-admin.vercel.app';
+
+  const cfg = await getActiveEmailConfig();
+
+  const hasSmtpCredentials = Boolean(cfg.smtpConfig.host && cfg.smtpConfig.user && cfg.smtpConfig.pass);
+  if (!hasSmtpCredentials) {
+    return {
+      emailSent: false,
+      channel: 'SMTP_NOT_CONFIGURED',
+      details: 'Gmail SMTP credentials (email and App Password) are not configured yet.',
+    };
+  }
+
+  const subject = params.customSubject || cfg.confirmationSubject;
+  const title = params.customTitle || cfg.confirmationTitle;
+  const subtitle = params.customSubtitle || cfg.confirmationSubtitle;
+  const bodyText = params.customBody || cfg.confirmationBody;
+
+  const html = buildConfirmationEmailHtml({
+    name: params.name,
+    username: params.username,
+    email: params.email,
+    country: params.country,
+    city: params.city,
+    confirmationCode: params.confirmationCode,
+    confirmationLink: params.confirmationLink,
+    logoUrl: `${baseUrl}/logo.png`,
+    title,
+    subtitle,
+    bodyText,
+  });
+
+  const parsedSubject = replaceEmailPlaceholders(subject, {
+    name: params.name,
+    username: params.username,
+    email: params.email,
+    country: params.country,
+    city: params.city,
+    code: params.confirmationCode,
+  });
+
+  const smtpResult = await sendSmtpEmail(
+    cfg.smtpConfig,
+    params.email,
+    parsedSubject,
+    html
+  );
+
+  return {
+    emailSent: smtpResult.success,
+    channel: smtpResult.success ? 'GMAIL_SMTP' : 'NONE',
+    details: smtpResult.error,
+  };
+}
+
+/**
+ * Send a test email for previewing customized Welcome or Confirmation templates.
+ */
+export async function sendTestEmail(params: {
+  toEmail: string;
+  templateType: 'welcome' | 'confirmation';
+  subject?: string;
+  title?: string;
+  subtitle?: string;
+  bodyText?: string;
+  originUrl?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const baseUrl =
+    params.originUrl ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://halallens-admin.vercel.app';
+
+  const cfg = await getActiveEmailConfig();
+
+  const hasSmtpCredentials = Boolean(cfg.smtpConfig.host && cfg.smtpConfig.user && cfg.smtpConfig.pass);
+  if (!hasSmtpCredentials) {
+    return {
+      success: false,
+      error: 'Gmail SMTP is not configured yet. Please configure your Gmail address and App Password first in the SMTP modal.',
+    };
+  }
+
+  const isWelcome = params.templateType === 'welcome';
+  const defaultSubject = isWelcome ? cfg.welcomeSubject : cfg.confirmationSubject;
+  const defaultTitle = isWelcome ? cfg.welcomeTitle : cfg.confirmationTitle;
+  const defaultSubtitle = isWelcome ? cfg.welcomeSubtitle : cfg.confirmationSubtitle;
+  const defaultBody = isWelcome ? cfg.welcomeBody : cfg.confirmationBody;
+
+  const rawSubject = (params.subject || defaultSubject).trim();
+  const rawTitle = (params.title || defaultTitle).trim();
+  const rawSubtitle = (params.subtitle || defaultSubtitle).trim();
+  const rawBody = params.bodyText !== undefined ? params.bodyText : defaultBody;
+
+  const sampleVars = {
+    name: 'Admin Test User',
+    username: 'admin.tester',
+    email: params.toEmail,
+    country: 'France',
+    city: 'Paris',
+    appName: 'Allo Halal',
+    code: '729401',
+    link: `${baseUrl}/verify?test=true`,
+    year: String(new Date().getFullYear()),
+  };
+
+  const finalSubject = `[TEST] ${replaceEmailPlaceholders(rawSubject, sampleVars)}`;
+
+  const html = isWelcome
+    ? buildWelcomeEmailHtml({
+        name: sampleVars.name,
+        username: sampleVars.username,
+        email: sampleVars.email,
+        country: sampleVars.country,
+        city: sampleVars.city,
+        logoUrl: `${baseUrl}/logo.png`,
+        title: rawTitle,
+        subtitle: rawSubtitle,
+        bodyText: rawBody,
+      })
+    : buildConfirmationEmailHtml({
+        name: sampleVars.name,
+        username: sampleVars.username,
+        email: sampleVars.email,
+        country: sampleVars.country,
+        city: sampleVars.city,
+        confirmationCode: sampleVars.code,
+        confirmationLink: sampleVars.link,
+        logoUrl: `${baseUrl}/logo.png`,
+        title: rawTitle,
+        subtitle: rawSubtitle,
+        bodyText: rawBody,
+      });
+
+  const res = await sendSmtpEmail(cfg.smtpConfig, params.toEmail, finalSubject, html);
+  return res;
 }

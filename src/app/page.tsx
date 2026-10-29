@@ -5,6 +5,7 @@ import { Sidebar, NavTab } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DashboardOverview } from '@/components/modules/DashboardOverview';
 import { ProductCatalog } from '@/components/modules/ProductCatalog';
+import { ContributionsManager } from '@/components/modules/ContributionsManager';
 import { AdditivesDictionary } from '@/components/modules/AdditivesDictionary';
 import { UserManagement } from '@/components/modules/UserManagement';
 import { AdminManagement } from '@/components/modules/AdminManagement';
@@ -46,13 +47,17 @@ import {
   fetchCmsSettings,
   saveCmsSettings,
   DEFAULT_CMS_SETTINGS,
+  fetchContributions,
+  updateContributionStatus,
+  deleteContribution,
 } from '@/lib/storage';
-import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, CmsSettings } from '@/lib/types';
+import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, CmsSettings, Contribution, DonationStatus } from '@/lib/types';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 
 const VALID_TABS: NavTab[] = [
   'dashboard',
   'products',
+  'contributions',
   'additives',
   'cms',
   'notifications',
@@ -79,6 +84,7 @@ export default function AdminDashboardPage() {
   const [groqSettings, setGroqSettings] = useState<GroqSettings>(DEFAULT_GROQ_SETTINGS);
   const [authSettings, setAuthSettings] = useState<AuthSettings>(DEFAULT_AUTH_SETTINGS);
   const [cmsSettings, setCmsSettings] = useState<CmsSettings>(DEFAULT_CMS_SETTINGS);
+  const [contributions, setContributions] = useState<Contribution[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Restore and sync active tab from URL hash and localStorage
@@ -133,7 +139,7 @@ export default function AdminDashboardPage() {
           setCurrentUser(user);
         }
 
-        const [prods, adds, usrs, adList, logList, admob, groq, authSet, cmsSet] = await Promise.all([
+        const [prods, adds, usrs, adList, logList, admob, groq, authSet, cmsSet, contribs] = await Promise.all([
           fetchProducts(),
           fetchAdditives(),
           fetchUsers(),
@@ -143,6 +149,7 @@ export default function AdminDashboardPage() {
           fetchGroqSettings(),
           fetchAuthSettings(),
           fetchCmsSettings(),
+          fetchContributions(),
         ]);
         if (isMounted) {
           setProducts(prods);
@@ -154,6 +161,7 @@ export default function AdminDashboardPage() {
           setGroqSettings(groq);
           setAuthSettings(authSet);
           setCmsSettings(cmsSet);
+          setContributions(contribs);
         }
       } catch (err) {
         console.error('Error loading Supabase data:', err);
@@ -266,6 +274,39 @@ export default function AdminDashboardPage() {
     setCmsSettings(updated);
   };
 
+  const handleUpdateContributionStatus = async (
+    contributionId: string,
+    status: DonationStatus
+  ) => {
+    const updated = await updateContributionStatus(
+      contributionId,
+      status,
+      currentUser?.name || 'Admin'
+    );
+    setContributions(updated);
+  };
+
+  const handleDeleteContribution = async (contributionId: string) => {
+    const updated = await deleteContribution(contributionId);
+    setContributions(updated);
+  };
+
+  const handleRefreshContributions = async () => {
+    const updated = await fetchContributions();
+    setContributions(updated);
+  };
+
+  const handleToggleContributions = async (enabled: boolean) => {
+    const updatedPayload: AuthSettings = {
+      ...authSettings,
+      id: 'global',
+      enableContributions: enabled,
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentUser?.name || 'Admin',
+    };
+    await handleSaveAuthSettings(updatedPayload);
+  };
+
   const handleLogout = async () => {
     await logoutAdmin();
     setCurrentUser(null);
@@ -290,6 +331,7 @@ export default function AdminDashboardPage() {
   // Sidebar live counts
   const counts = {
     pendingReviews: products.filter((p) => (p.manualStatus || p.aiStatus) === 'MUSHBOOH').length,
+    pendingContributions: contributions.filter((c) => c.status === 'PENDING').length,
     totalAdditives: additives.length,
     bannedUsers: users.filter((u) => u.isBanned).length,
     activeAds: ads.filter((a) => a.isActive).length,
@@ -338,6 +380,20 @@ export default function AdminDashboardPage() {
                 onDeleteProduct={handleDeleteProduct}
                 currentAdminName={currentUser?.name}
                 searchQuery={searchQuery}
+              />
+            )}
+
+            {activeTab === 'contributions' && (
+              <ContributionsManager
+                contributions={contributions}
+                onDelete={handleDeleteContribution}
+                currentAdminName={currentUser?.name}
+                searchQuery={searchQuery}
+                isContributionsEnabled={authSettings.enableContributions !== false}
+                onToggleContributions={handleToggleContributions}
+                authSettings={authSettings}
+                onSaveAuthSettings={handleSaveAuthSettings}
+                onRefresh={handleRefreshContributions}
               />
             )}
 

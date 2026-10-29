@@ -14,24 +14,26 @@ import {
   Radio,
   Bell,
   FileText,
+  HeartHandshake,
 } from 'lucide-react';
 
 import { APP_COLORS } from '@/lib/colors';
 
-export type NavTab = 'dashboard' | 'products' | 'additives' | 'cms' | 'users' | 'admins' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
+export type NavTab = 'dashboard' | 'products' | 'contributions' | 'additives' | 'cms' | 'users' | 'admins' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
 
 interface SidebarProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   counts?: {
     pendingReviews: number;
+    pendingContributions?: number;
     totalAdditives: number;
     bannedUsers: number;
     activeAds: number;
   };
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts }) => {
   const navItems = [
     {
       id: 'dashboard' as NavTab,
@@ -44,6 +46,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
       label: 'Products',
       sublabel: 'Catalog & Review',
       icon: PackageSearch,
+      badge: counts?.pendingReviews,
+      badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    },
+    {
+      id: 'contributions' as NavTab,
+      label: 'Contributions',
+      sublabel: 'Donations & Support',
+      icon: HeartHandshake,
     },
     {
       id: 'additives' as NavTab,
@@ -138,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
               type="button"
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`w-full text-left flex items-center px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
+              className={`w-full text-left flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer ${
                 isActive
                   ? `${c.primaryActiveTab}`
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
@@ -157,6 +167,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange }) => {
                   <div className="text-[11px] text-slate-400 mt-1 truncate">{item.sublabel}</div>
                 </div>
               </div>
+
+              {Boolean(item.badge && item.badge > 0) && (
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-2xs ${
+                    item.badgeColor || 'bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
+                >
+                  {item.badge}
+                </span>
+              )}
             </button>
           );
         })}

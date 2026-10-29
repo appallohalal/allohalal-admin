@@ -56,6 +56,26 @@ export interface UserAccount {
   createdAt: string;
 }
 
+export type DonationStatus = 'COMPLETED' | 'PENDING' | 'REFUNDED';
+export type DonationTier = 'COFFEE' | 'SERVER' | 'GROWTH' | 'PATRON';
+
+export interface Contribution {
+  id: string;
+  donorName: string;
+  donorEmail: string;
+  donorLocation?: string;
+  amount: number;
+  currency: string; // 'EUR' | 'USD' | 'GBP'
+  tier: DonationTier;
+  paymentMethod: 'STRIPE' | 'PAYPAL' | 'APPLE_PAY' | 'GOOGLE_PAY' | 'MANUAL';
+  transactionId?: string;
+  message?: string;
+  status: DonationStatus;
+  isAnonymous?: boolean;
+  reviewedBy?: string;
+  createdAt: string;
+}
+
 export interface GeoAd {
   id: string;
   title: string;
@@ -170,6 +190,7 @@ export interface AuthSettings {
   id: string;
   forceUserAuth: boolean;
   allowGuestScan: boolean;
+  enableContributions?: boolean;
   requireEmailVerification?: boolean;
   sendWelcomeEmail?: boolean;
   emailProvider?: 'SUPABASE' | 'SMTP' | 'BOTH';
@@ -179,6 +200,42 @@ export interface AuthSettings {
   smtpPass?: string;
   smtpFromEmail?: string;
   smtpFromName?: string;
+  welcomeEmailSubject?: string;
+  welcomeEmailTitle?: string;
+  welcomeEmailSubtitle?: string;
+  welcomeEmailBody?: string;
+  confirmationEmailSubject?: string;
+  confirmationEmailTitle?: string;
+  confirmationEmailSubtitle?: string;
+  confirmationEmailBody?: string;
+
+  // Contribution Presets & Tiers Configuration
+  contributionPresets?: number[]; // e.g. [1, 3, 5, 10, 15]
+  defaultContributionAmount?: number; // e.g. 5
+  minContributionAmount?: number; // e.g. 1
+  maxContributionAmount?: number; // e.g. 50
+  contributionCurrency?: string; // e.g. 'EUR'
+  coffeeMaxAmount?: number; // e.g. 2
+  serverMaxAmount?: number; // e.g. 4
+  growthMaxAmount?: number; // e.g. 9
+
+  // Humanitarian Commitment & Solidarity
+  enableHumanitarianCommitment?: boolean;
+  humanitarianTitle?: string;
+  humanitarianBadge?: string;
+  humanitarianCharityShare?: string;
+  humanitarianText?: string;
+  humanitarianOrganizationName?: string;
+  humanitarianLearnMoreUrl?: string;
+
+  // Payment Gateway Configuration (Stripe)
+  enableStripe?: boolean;
+  stripeMode?: 'test' | 'live';
+  stripePublishableKey?: string;
+  stripeSecretKey?: string;
+  stripeWebhookSecret?: string;
+  stripeCurrency?: string;
+
   updatedAt: string;
   updatedBy: string;
 }
@@ -257,6 +314,16 @@ export interface CmsTexts {
 
   // Geo-Ads & Proximity Custom Message
   geoAdsNoticeText?: string;
+
+  // Registration Email Customization (Welcome & Confirmation)
+  welcomeEmailSubject?: string;
+  welcomeEmailTitle?: string;
+  welcomeEmailSubtitle?: string;
+  welcomeEmailBody?: string;
+  confirmationEmailSubject?: string;
+  confirmationEmailTitle?: string;
+  confirmationEmailSubtitle?: string;
+  confirmationEmailBody?: string;
 }
 
 export interface CmsSettings {

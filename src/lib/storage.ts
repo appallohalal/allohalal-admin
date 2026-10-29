@@ -1,6 +1,6 @@
 'use client';
 
-import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, PushNotification, NotificationSettings, CmsSettings, CmsTexts } from './types';
+import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, PushNotification, NotificationSettings, CmsSettings, CmsTexts, Contribution, DonationStatus, DonationTier } from './types';
 import { supabase } from './supabase';
 
 const STORAGE_KEYS = {
@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'halallens_supabase_notifications',
   NOTIFICATION_SETTINGS: 'halallens_supabase_notification_settings',
   CMS_SETTINGS: 'halallens_supabase_cms_settings',
+  CONTRIBUTIONS: 'halallens_supabase_contributions',
 };
 
 // ==========================================
@@ -752,10 +753,31 @@ export const saveGroqSettings = async (
 // 8. MOBILE AUTH FEATURE TOGGLE (Supabase integration)
 // ==========================================
 
+export const DEFAULT_EMAIL_TEMPLATES = {
+  welcomeSubject: 'Welcome to Allo Halal! Your Account is Ready',
+  welcomeTitle: 'Welcome to Allo Halal!',
+  welcomeSubtitle: 'Your trusted AI-powered companion for verifying Halal products & ingredients',
+  welcomeBody: `Assalamu Alaikum {name},
+
+Thank you for joining the Allo Halal community! Your account is now active and ready to use across the mobile app.
+
+Scan any food barcode to check Halal status, capture ingredient labels for instant AI analysis, and explore additives with authentic scholarly guidance.`,
+
+  confirmationSubject: 'Confirm Your Allo Halal Account',
+  confirmationTitle: 'Verify Your Email Address',
+  confirmationSubtitle: 'Please verify your email address to secure and activate your account',
+  confirmationBody: `Assalamu Alaikum {name},
+
+Thank you for registering with Allo Halal! To ensure your account security and unlock full access to barcode scanning, AI ingredient analysis, and community features, please confirm your email address.
+
+Click the confirmation button below or use your verification code to complete your registration.`,
+};
+
 export const DEFAULT_AUTH_SETTINGS: AuthSettings = {
   id: 'global',
   forceUserAuth: false,
   allowGuestScan: true,
+  enableContributions: true,
   requireEmailVerification: false,
   sendWelcomeEmail: true,
   emailProvider: 'SMTP',
@@ -765,6 +787,35 @@ export const DEFAULT_AUTH_SETTINGS: AuthSettings = {
   smtpPass: '',
   smtpFromEmail: '',
   smtpFromName: 'Allo Halal',
+  welcomeEmailSubject: DEFAULT_EMAIL_TEMPLATES.welcomeSubject,
+  welcomeEmailTitle: DEFAULT_EMAIL_TEMPLATES.welcomeTitle,
+  welcomeEmailSubtitle: DEFAULT_EMAIL_TEMPLATES.welcomeSubtitle,
+  welcomeEmailBody: DEFAULT_EMAIL_TEMPLATES.welcomeBody,
+  confirmationEmailSubject: DEFAULT_EMAIL_TEMPLATES.confirmationSubject,
+  confirmationEmailTitle: DEFAULT_EMAIL_TEMPLATES.confirmationTitle,
+  confirmationEmailSubtitle: DEFAULT_EMAIL_TEMPLATES.confirmationSubtitle,
+  confirmationEmailBody: DEFAULT_EMAIL_TEMPLATES.confirmationBody,
+  contributionPresets: [1, 3, 5, 10, 15],
+  defaultContributionAmount: 5,
+  minContributionAmount: 1,
+  maxContributionAmount: 50,
+  contributionCurrency: 'EUR',
+  coffeeMaxAmount: 2,
+  serverMaxAmount: 4,
+  growthMaxAmount: 9,
+  enableHumanitarianCommitment: true,
+  humanitarianTitle: 'Humanitarian Commitment & Solidarity',
+  humanitarianBadge: 'Charity Redistribution Partner',
+  humanitarianCharityShare: '20% Redistributed to Charity',
+  humanitarianText: 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.',
+  humanitarianOrganizationName: 'Global Halal Emergency Food Relief',
+  humanitarianLearnMoreUrl: 'https://allohalal.fr/humanitarian',
+  enableStripe: true,
+  stripeMode: 'test',
+  stripePublishableKey: 'pk_test_51P9nVoRrokKxR1k7GYpiCd7B9ZVwmR7MBuYx28GmKrRsaOPUHmSMSIESH62ZVDwx6IFlN8xSz7br9cg0LzfLVbrK00uFBuBNzr',
+  stripeSecretKey: '',
+  stripeWebhookSecret: '',
+  stripeCurrency: 'eur',
   updatedAt: new Date().toISOString(),
   updatedBy: 'Admin',
 };
@@ -782,6 +833,7 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
         id: data.id,
         forceUserAuth: data.force_user_auth === true,
         allowGuestScan: data.allow_guest_scan !== false,
+        enableContributions: data.enable_contributions !== false,
         requireEmailVerification: data.require_email_verification === true,
         sendWelcomeEmail: data.send_welcome_email !== false,
         emailProvider: 'SMTP',
@@ -791,6 +843,35 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
         smtpPass: data.smtp_pass || '',
         smtpFromEmail: data.smtp_from_email || data.smtp_user || '',
         smtpFromName: data.smtp_from_name || 'Allo Halal',
+        welcomeEmailSubject: data.welcome_email_subject || DEFAULT_EMAIL_TEMPLATES.welcomeSubject,
+        welcomeEmailTitle: data.welcome_email_title || DEFAULT_EMAIL_TEMPLATES.welcomeTitle,
+        welcomeEmailSubtitle: data.welcome_email_subtitle || DEFAULT_EMAIL_TEMPLATES.welcomeSubtitle,
+        welcomeEmailBody: data.welcome_email_body || DEFAULT_EMAIL_TEMPLATES.welcomeBody,
+        confirmationEmailSubject: data.confirmation_email_subject || DEFAULT_EMAIL_TEMPLATES.confirmationSubject,
+        confirmationEmailTitle: data.confirmation_email_title || DEFAULT_EMAIL_TEMPLATES.confirmationTitle,
+        confirmationEmailSubtitle: data.confirmation_email_subtitle || DEFAULT_EMAIL_TEMPLATES.confirmationSubtitle,
+        confirmationEmailBody: data.confirmation_email_body || DEFAULT_EMAIL_TEMPLATES.confirmationBody,
+        contributionPresets: Array.isArray(data.contribution_presets) ? data.contribution_presets : [1, 3, 5, 10, 15],
+        defaultContributionAmount: Number(data.default_contribution_amount || 5),
+        minContributionAmount: Number(data.min_contribution_amount || 1),
+        maxContributionAmount: Number(data.max_contribution_amount || 50),
+        contributionCurrency: data.contribution_currency || 'EUR',
+        coffeeMaxAmount: Number(data.coffee_max_amount || 2),
+        serverMaxAmount: Number(data.server_max_amount || 4),
+        growthMaxAmount: Number(data.growth_max_amount || 9),
+        enableHumanitarianCommitment: data.enable_humanitarian_commitment !== false,
+        humanitarianTitle: data.humanitarian_title || 'Humanitarian Commitment & Solidarity',
+        humanitarianBadge: data.humanitarian_badge || 'Charity Redistribution Partner',
+        humanitarianCharityShare: data.humanitarian_charity_share || '20% Redistributed to Charity',
+        humanitarianText: data.humanitarian_text || 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.',
+        humanitarianOrganizationName: data.humanitarian_organization_name || 'Global Halal Emergency Food Relief',
+        humanitarianLearnMoreUrl: data.humanitarian_learn_more_url || 'https://allohalal.fr/humanitarian',
+        enableStripe: data.enable_stripe !== false,
+        stripeMode: (data.stripe_mode === 'live' ? 'live' : 'test'),
+        stripePublishableKey: data.stripe_publishable_key || '',
+        stripeSecretKey: data.stripe_secret_key || '',
+        stripeWebhookSecret: data.stripe_webhook_secret || '',
+        stripeCurrency: data.stripe_currency || 'eur',
         updatedAt: data.updated_at || new Date().toISOString(),
         updatedBy: data.updated_by || 'Admin',
       };
@@ -807,7 +888,11 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
     const cached = localStorage.getItem(STORAGE_KEYS.AUTH_SETTINGS);
     if (cached) {
       try {
-        return JSON.parse(cached);
+        const parsed = JSON.parse(cached);
+        return {
+          ...DEFAULT_AUTH_SETTINGS,
+          ...parsed,
+        };
       } catch (_) {}
     }
   }
@@ -819,10 +904,11 @@ export const saveAuthSettings = async (
   settings: AuthSettings,
   updatedBy: string = 'Admin'
 ): Promise<AuthSettings> => {
-  const payload = {
+  const payload: Record<string, any> = {
     id: 'global',
     force_user_auth: settings.forceUserAuth,
     allow_guest_scan: !settings.forceUserAuth,
+    enable_contributions: settings.enableContributions !== false,
     require_email_verification: Boolean(settings.requireEmailVerification),
     send_welcome_email: settings.sendWelcomeEmail !== false,
     email_provider: settings.emailProvider || 'BOTH',
@@ -832,6 +918,35 @@ export const saveAuthSettings = async (
     smtp_pass: settings.smtpPass || '',
     smtp_from_email: (settings.smtpFromEmail || '').trim(),
     smtp_from_name: (settings.smtpFromName || 'Allo Halal').trim(),
+    welcome_email_subject: settings.welcomeEmailSubject ?? DEFAULT_EMAIL_TEMPLATES.welcomeSubject,
+    welcome_email_title: settings.welcomeEmailTitle ?? DEFAULT_EMAIL_TEMPLATES.welcomeTitle,
+    welcome_email_subtitle: settings.welcomeEmailSubtitle ?? DEFAULT_EMAIL_TEMPLATES.welcomeSubtitle,
+    welcome_email_body: settings.welcomeEmailBody ?? DEFAULT_EMAIL_TEMPLATES.welcomeBody,
+    confirmation_email_subject: settings.confirmationEmailSubject ?? DEFAULT_EMAIL_TEMPLATES.confirmationSubject,
+    confirmation_email_title: settings.confirmationEmailTitle ?? DEFAULT_EMAIL_TEMPLATES.confirmationTitle,
+    confirmation_email_subtitle: settings.confirmationEmailSubtitle ?? DEFAULT_EMAIL_TEMPLATES.confirmationSubtitle,
+    confirmation_email_body: settings.confirmationEmailBody ?? DEFAULT_EMAIL_TEMPLATES.confirmationBody,
+    contribution_presets: settings.contributionPresets || [1, 3, 5, 10, 15],
+    default_contribution_amount: Number(settings.defaultContributionAmount || 5),
+    min_contribution_amount: Number(settings.minContributionAmount || 1),
+    max_contribution_amount: Number(settings.maxContributionAmount || 50),
+    contribution_currency: settings.contributionCurrency || 'EUR',
+    coffee_max_amount: Number(settings.coffeeMaxAmount || 2),
+    server_max_amount: Number(settings.serverMaxAmount || 4),
+    growth_max_amount: Number(settings.growthMaxAmount || 9),
+    enable_humanitarian_commitment: settings.enableHumanitarianCommitment !== false,
+    humanitarian_title: settings.humanitarianTitle || 'Humanitarian Commitment & Solidarity',
+    humanitarian_badge: settings.humanitarianBadge || 'Charity Redistribution Partner',
+    humanitarian_charity_share: settings.humanitarianCharityShare || '20% Redistributed to Charity',
+    humanitarian_text: settings.humanitarianText || '',
+    humanitarian_organization_name: settings.humanitarianOrganizationName || 'Global Halal Emergency Food Relief',
+    humanitarian_learn_more_url: settings.humanitarianLearnMoreUrl || 'https://allohalal.fr/humanitarian',
+    enable_stripe: settings.enableStripe !== false,
+    stripe_mode: settings.stripeMode === 'live' ? 'live' : 'test',
+    stripe_publishable_key: (settings.stripePublishableKey || '').trim(),
+    stripe_secret_key: (settings.stripeSecretKey || '').trim(),
+    stripe_webhook_secret: (settings.stripeWebhookSecret || '').trim(),
+    stripe_currency: (settings.stripeCurrency || 'eur').trim().toLowerCase(),
     updated_at: new Date().toISOString(),
     updated_by: updatedBy,
   };
@@ -839,8 +954,26 @@ export const saveAuthSettings = async (
   try {
     const { error } = await supabase.from('auth_settings').upsert(payload);
     if (error) {
-      console.error('Error saving Auth settings to Supabase:', error);
-      throw error;
+      console.warn('Initial Supabase upsert error, attempting fallback without template columns:', error.message);
+      // Fallback in case table does not have new template columns yet
+      const fallbackPayload = {
+        id: 'global',
+        force_user_auth: settings.forceUserAuth,
+        allow_guest_scan: !settings.forceUserAuth,
+        enable_contributions: settings.enableContributions !== false,
+        require_email_verification: Boolean(settings.requireEmailVerification),
+        send_welcome_email: settings.sendWelcomeEmail !== false,
+        email_provider: settings.emailProvider || 'BOTH',
+        smtp_host: (settings.smtpHost || '').trim(),
+        smtp_port: Number(settings.smtpPort || 587),
+        smtp_user: (settings.smtpUser || '').trim(),
+        smtp_pass: settings.smtpPass || '',
+        smtp_from_email: (settings.smtpFromEmail || '').trim(),
+        smtp_from_name: (settings.smtpFromName || 'Allo Halal').trim(),
+        updated_at: payload.updated_at,
+        updated_by: updatedBy,
+      };
+      await supabase.from('auth_settings').upsert(fallbackPayload);
     }
   } catch (err) {
     console.warn('Supabase save Auth settings warning:', err);
@@ -848,6 +981,7 @@ export const saveAuthSettings = async (
 
   if (typeof window !== 'undefined') {
     const updated: AuthSettings = {
+      ...DEFAULT_AUTH_SETTINGS,
       ...settings,
       allowGuestScan: !settings.forceUserAuth,
       updatedAt: payload.updated_at,
@@ -1055,6 +1189,16 @@ export const DEFAULT_CMS_TEXTS: CmsTexts = {
   termsContent:
     "Conditions Générales d'Utilisation (CGU)\nDernière mise à jour : Octobre 2026\n\n1. Objet et Acceptation\nLes présentes Conditions Générales d'Utilisation régissent l'accès et l'utilisation de l'application mobile Allo Halal. L'utilisation de l'application implique l'acceptation sans réserve des présentes conditions.\n\n2. Nature Indicative des Analyses IA\nL'application fournit des analyses de statut Halal basées sur la reconnaissance automatique d'images (OCR) et des modèles d'intelligence artificielle. Ces analyses sont fournies à titre purement indicatif et consultatif. Bien que nous nous efforcions d'assurer une exactitude maximale, l'utilisateur est invité à vérifier directement les étiquettes et à se référer aux organismes officiels de certification halal en cas de doute.\n\n3. Propriété Intellectuelle\nTous les contenus, logos, graphismes et logiciels composant Allo Halal sont la propriété exclusive d'Allo Halal et sont protégés par les lois internationales sur la propriété intellectuelle.\n\n4. Comportement des Utilisateurs\nL'utilisateur s'engage à utiliser l'application dans le respect des lois en vigueur et à ne pas tenter de perturber le fonctionnement des serveurs ou d'extraire des données de manière automatisée.\n\n5. Mises à Jour en Temps Réel\nAllo Halal se réserve le droit de modifier les présentes CGU à tout moment. Toute modification est immédiatement synchronisée dans l'application via notre système CMS.\n\nContact légal : support@allohalal.fr",
   geoAdsNoticeText: 'Offres et promotions Halal à proximité de vous',
+
+  // Registration Email Customization (Welcome & Confirmation)
+  welcomeEmailSubject: DEFAULT_EMAIL_TEMPLATES.welcomeSubject,
+  welcomeEmailTitle: DEFAULT_EMAIL_TEMPLATES.welcomeTitle,
+  welcomeEmailSubtitle: DEFAULT_EMAIL_TEMPLATES.welcomeSubtitle,
+  welcomeEmailBody: DEFAULT_EMAIL_TEMPLATES.welcomeBody,
+  confirmationEmailSubject: DEFAULT_EMAIL_TEMPLATES.confirmationSubject,
+  confirmationEmailTitle: DEFAULT_EMAIL_TEMPLATES.confirmationTitle,
+  confirmationEmailSubtitle: DEFAULT_EMAIL_TEMPLATES.confirmationSubtitle,
+  confirmationEmailBody: DEFAULT_EMAIL_TEMPLATES.confirmationBody,
 };
 
 export const DEFAULT_CMS_SETTINGS: CmsSettings = {
@@ -1145,6 +1289,195 @@ export const saveCmsSettings = async (
   }
 
   return fetchCmsSettings();
+};
+
+// ==========================================
+// 10. COMMUNITY DONATIONS & FREE-WILL CONTRIBUTIONS ("Prix libre")
+// Real live contributions ledger (No static/demo data)
+// ==========================================
+
+export const DEFAULT_CONTRIBUTIONS: Contribution[] = [];
+
+export const fetchContributions = async (): Promise<Contribution[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('contributions')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && Array.isArray(data)) {
+      const mapped: Contribution[] = data.map((item: any) => {
+        const rawTier = String(item.tier || 'SERVER').toUpperCase();
+        const tier: DonationTier = ['COFFEE', 'SERVER', 'GROWTH', 'PATRON'].includes(rawTier)
+          ? (rawTier as DonationTier)
+          : 'SERVER';
+
+        const rawStatus = String(item.status || 'COMPLETED').toUpperCase();
+        const status =
+          rawStatus === 'PENDING'
+            ? 'PENDING'
+            : rawStatus === 'REFUNDED'
+            ? 'REFUNDED'
+            : 'COMPLETED';
+
+        return {
+          id: String(item.id || item.transaction_id || `don_${Date.now()}`),
+          donorName: item.donor_name || item.user_name || 'Allo Halal Mobile Supporter',
+          donorEmail: item.donor_email || item.user_email || '',
+          donorLocation: item.donor_location || item.user_location,
+          amount: Number(item.amount || 0),
+          currency: (item.currency || 'EUR').toUpperCase(),
+          tier,
+          paymentMethod: (item.payment_method || 'STRIPE').toUpperCase(),
+          transactionId: item.transaction_id || item.stripe_session_id || item.id,
+          message: item.message || item.moderator_note || '',
+          status,
+          isAnonymous: item.is_anonymous === true,
+          reviewedBy: item.reviewed_by,
+          createdAt: item.created_at || new Date().toISOString(),
+        };
+      });
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.CONTRIBUTIONS, JSON.stringify(mapped));
+      }
+      return mapped;
+    }
+  } catch (err) {
+    console.warn('Supabase fetch Contributions note:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(STORAGE_KEYS.CONTRIBUTIONS);
+    if (cached) {
+      try {
+        const rawList = JSON.parse(cached);
+        if (Array.isArray(rawList)) {
+          // Filter out legacy static demo items
+          const sanitized: Contribution[] = rawList
+            .filter((item: any) => {
+              const id = String(item.id || '');
+              return id !== 'don_1' && id !== 'don_2' && id !== 'don_3' && id !== 'don_4' && id !== 'don_5' && id !== 'don_6';
+            })
+            .map((item: any, idx: number) => ({
+              id: item.id || `contrib_${Date.now()}_${idx}`,
+              donorName: item.donorName || item.donor_name || item.userName || item.user_name || 'Anonymous Donor',
+              donorEmail: item.donorEmail || item.donor_email || item.userEmail || item.user_email || '',
+              donorLocation: item.donorLocation || item.donor_location || item.userLocation || item.user_location,
+              amount: Number(item.amount || 0),
+              currency: item.currency || 'EUR',
+              tier: item.tier || 'SERVER',
+              paymentMethod: item.paymentMethod || item.payment_method || 'STRIPE',
+              transactionId: item.transactionId || item.transaction_id,
+              message: item.message || item.moderatorNote || item.moderator_note || '',
+              status: item.status === 'PENDING' ? 'PENDING' : item.status === 'REFUNDED' ? 'REFUNDED' : 'COMPLETED',
+              isAnonymous: Boolean(item.isAnonymous ?? item.is_anonymous),
+              reviewedBy: item.reviewedBy || item.reviewed_by,
+              createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+            }));
+
+          localStorage.setItem(STORAGE_KEYS.CONTRIBUTIONS, JSON.stringify(sanitized));
+          return sanitized;
+        }
+      } catch (_) {}
+    }
+  }
+
+  return [];
+};
+
+export const saveContribution = async (contrib: Contribution): Promise<Contribution> => {
+  const payload = {
+    id: contrib.id,
+    donor_name: contrib.donorName,
+    donor_email: contrib.donorEmail,
+    donor_location: contrib.donorLocation,
+    amount: contrib.amount,
+    currency: contrib.currency,
+    tier: contrib.tier,
+    payment_method: contrib.paymentMethod,
+    transaction_id: contrib.transactionId,
+    message: contrib.message,
+    status: contrib.status,
+    is_anonymous: Boolean(contrib.isAnonymous),
+    reviewed_by: contrib.reviewedBy,
+    created_at: contrib.createdAt,
+  };
+
+  try {
+    const { error } = await supabase.from('contributions').upsert(payload);
+    if (error) console.warn('Supabase save contribution note:', error.message);
+  } catch (err) {
+    console.warn('Supabase save contribution error:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(STORAGE_KEYS.CONTRIBUTIONS);
+    let list: Contribution[] = cached ? JSON.parse(cached) : [...DEFAULT_CONTRIBUTIONS];
+    const index = list.findIndex((c) => c.id === contrib.id);
+    if (index >= 0) {
+      list[index] = contrib;
+    } else {
+      list = [contrib, ...list];
+    }
+    localStorage.setItem(STORAGE_KEYS.CONTRIBUTIONS, JSON.stringify(list));
+  }
+
+  return contrib;
+};
+
+export const updateContributionStatus = async (
+  id: string,
+  status: DonationStatus,
+  reviewedBy: string = 'Admin'
+): Promise<Contribution[]> => {
+  try {
+    await supabase
+      .from('contributions')
+      .update({
+        status,
+        reviewed_by: reviewedBy,
+      })
+      .eq('id', id);
+  } catch (err) {
+    console.warn('Supabase update donation status note:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(STORAGE_KEYS.CONTRIBUTIONS);
+    let list: Contribution[] = cached ? JSON.parse(cached) : [...DEFAULT_CONTRIBUTIONS];
+    list = list.map((c) =>
+      c.id === id
+        ? {
+            ...c,
+            status,
+            reviewedBy,
+          }
+        : c
+    );
+    localStorage.setItem(STORAGE_KEYS.CONTRIBUTIONS, JSON.stringify(list));
+    return list;
+  }
+
+  return fetchContributions();
+};
+
+export const deleteContribution = async (id: string): Promise<Contribution[]> => {
+  try {
+    await supabase.from('contributions').delete().eq('id', id);
+  } catch (err) {
+    console.warn('Supabase delete contribution note:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(STORAGE_KEYS.CONTRIBUTIONS);
+    let list: Contribution[] = cached ? JSON.parse(cached) : [...DEFAULT_CONTRIBUTIONS];
+    list = list.filter((c) => c.id !== id);
+    localStorage.setItem(STORAGE_KEYS.CONTRIBUTIONS, JSON.stringify(list));
+    return list;
+  }
+
+  return fetchContributions();
 };
 
 

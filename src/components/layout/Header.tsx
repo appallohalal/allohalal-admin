@@ -22,6 +22,10 @@ const TAB_TITLES: Record<NavTab, { title: string; desc: string }> = {
     title: 'Products',
     desc: 'Catalog and review',
   },
+  contributions: {
+    title: 'Contributions',
+    desc: 'Community donations, free-will contributions, and financial support',
+  },
   additives: {
     title: 'Additives',
     desc: 'E-numbers dictionary',

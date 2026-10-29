@@ -863,6 +863,121 @@ export const AppCmsManager: React.FC<AppCmsManagerProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Registration Email Customization (Welcome & Confirmation) */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-3 bg-white">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-9 h-9 rounded-xl ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder} border flex items-center justify-center shrink-0`}
+                  >
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Registration Emails (Welcome &amp; Confirmation)
+                    </h3>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Customize titles, subjects, and text for transactional registration emails
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Welcome Email Box */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#088839]" />
+                    <h4 className="text-xs font-bold text-slate-900">1. Welcome Email</h4>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Welcome Email Subject
+                      </label>
+                      <input
+                        type="text"
+                        value={texts.welcomeEmailSubject || ''}
+                        onChange={(e) => handleChange('welcomeEmailSubject', e.target.value)}
+                        placeholder="Welcome to Allo Halal! Your Account is Ready"
+                        className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none ${c.primaryFocus} transition-all`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Welcome Email Banner Title
+                      </label>
+                      <input
+                        type="text"
+                        value={texts.welcomeEmailTitle || ''}
+                        onChange={(e) => handleChange('welcomeEmailTitle', e.target.value)}
+                        placeholder="Welcome to Allo Halal!"
+                        className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none ${c.primaryFocus} transition-all`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Welcome Email Body Text
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={texts.welcomeEmailBody || ''}
+                      onChange={(e) => handleChange('welcomeEmailBody', e.target.value)}
+                      placeholder="Assalamu Alaikum {name},\n\nThank you for joining the Allo Halal community!..."
+                      className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none ${c.primaryFocus} transition-all`}
+                    />
+                  </div>
+                </div>
+
+                {/* Confirmation Email Box */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <h4 className="text-xs font-bold text-slate-900">2. Confirmation Email</h4>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Confirmation Email Subject
+                      </label>
+                      <input
+                        type="text"
+                        value={texts.confirmationEmailSubject || ''}
+                        onChange={(e) => handleChange('confirmationEmailSubject', e.target.value)}
+                        placeholder="Confirm Your Allo Halal Account"
+                        className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none ${c.primaryFocus} transition-all`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        Confirmation Email Banner Title
+                      </label>
+                      <input
+                        type="text"
+                        value={texts.confirmationEmailTitle || ''}
+                        onChange={(e) => handleChange('confirmationEmailTitle', e.target.value)}
+                        placeholder="Verify Your Email Address"
+                        className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none ${c.primaryFocus} transition-all`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Confirmation Email Body Text
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={texts.confirmationEmailBody || ''}
+                      onChange={(e) => handleChange('confirmationEmailBody', e.target.value)}
+                      placeholder="Assalamu Alaikum {name},\n\nThank you for registering with Allo Halal! To verify your email address..."
+                      className={`w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-medium text-slate-900 focus:outline-none ${c.primaryFocus} transition-all`}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
