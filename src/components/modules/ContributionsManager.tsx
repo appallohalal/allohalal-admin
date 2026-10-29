@@ -611,15 +611,20 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                 <h2 className="text-sm font-bold text-slate-900 tracking-tight">
                   Donations Feature
                 </h2>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-colors ${
+                <button
+                  type="button"
+                  onClick={handleToggle}
+                  disabled={isToggling}
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all cursor-pointer hover:opacity-80 flex items-center gap-1 ${
                     isContributionsEnabled
                       ? `${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`
-                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                      : 'bg-rose-50 text-rose-700 border-rose-200'
                   }`}
+                  title="Click to toggle status"
                 >
+                  <span className={`w-1.5 h-1.5 rounded-full ${isContributionsEnabled ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                   {isContributionsEnabled ? 'Active' : 'Disabled'}
-                </span>
+                </button>
               </div>
               <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
                 {isContributionsEnabled

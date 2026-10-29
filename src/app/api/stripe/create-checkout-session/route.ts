@@ -39,11 +39,17 @@ export async function POST(request: Request) {
     try {
       const { data } = await supabase
         .from('auth_settings')
-        .select('stripe_secret_key, stripe_currency, enable_stripe')
+        .select('stripe_secret_key, stripe_currency, enable_stripe, enable_contributions')
         .eq('id', 'global')
         .maybeSingle();
 
       if (data) {
+        if (data.enable_contributions === false) {
+          return NextResponse.json(
+            { success: false, error: 'Donations feature is currently disabled by the administrator.' },
+            { status: 403, headers: corsHeaders() }
+          );
+        }
         if (data.enable_stripe === false) {
           return NextResponse.json(
             { success: false, error: 'Stripe payments are currently disabled by the administrator.' },
