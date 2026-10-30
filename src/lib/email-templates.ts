@@ -76,7 +76,7 @@ export function buildWelcomeEmailHtml(params: {
     month: 'long',
     day: 'numeric',
   });
-  const logoUrl = params.logoUrl || 'https://halallens-admin.vercel.app/logo.png';
+  const logoUrl = params.logoUrl || 'https://allohalal-admin.vercel.app/logo.png';
 
   const templateVars = {
     name: params.name,
@@ -266,11 +266,11 @@ export function buildConfirmationEmailHtml(params: {
   subtitle?: string;
   bodyText?: string;
 }): string {
-  const logoUrl = params.logoUrl || 'https://halallens-admin.vercel.app/logo.png';
+  const logoUrl = params.logoUrl || 'https://allohalal-admin.vercel.app/logo.png';
   const confirmationCode = params.confirmationCode || '849201';
   const confirmationLink =
     params.confirmationLink ||
-    'https://halallens-admin.vercel.app/verify?code=' + confirmationCode;
+    'https://allohalal-admin.vercel.app/verify?code=' + confirmationCode;
 
   const templateVars = {
     name: params.name,

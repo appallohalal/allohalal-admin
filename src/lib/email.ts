@@ -277,7 +277,7 @@ export async function sendRegistrationWelcomeEmail(params: WelcomeEmailParams): 
   const baseUrl =
     params.originUrl ||
     process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://halallens-admin.vercel.app';
+    'https://allohalal-admin.vercel.app';
 
   const cfg = await getActiveEmailConfig();
 
@@ -344,7 +344,7 @@ export async function sendRegistrationConfirmationEmail(params: ConfirmationEmai
   const baseUrl =
     params.originUrl ||
     process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://halallens-admin.vercel.app';
+    'https://allohalal-admin.vercel.app';
 
   const cfg = await getActiveEmailConfig();
 
@@ -414,7 +414,7 @@ export async function sendTestEmail(params: {
   const baseUrl =
     params.originUrl ||
     process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://halallens-admin.vercel.app';
+    'https://allohalal-admin.vercel.app';
 
   const cfg = await getActiveEmailConfig();
 
