@@ -9,6 +9,7 @@ import { ContributionsManager } from '@/components/modules/ContributionsManager'
 import { AdditivesDictionary } from '@/components/modules/AdditivesDictionary';
 import { UserManagement } from '@/components/modules/UserManagement';
 import { AdminManagement } from '@/components/modules/AdminManagement';
+import { Security2FAManagement } from '@/components/modules/Security2FAManagement';
 import { GeoAds } from '@/components/modules/GeoAds';
 import { AnalyticsDashboard } from '@/components/modules/AnalyticsDashboard';
 import { GroqLogs } from '@/components/modules/GroqLogs';
@@ -70,6 +71,7 @@ const VALID_TABS: NavTab[] = [
   'notifications',
   'users',
   'admins',
+  'security',
   'admob',
   'ads',
   'analytics',
@@ -459,6 +461,13 @@ export default function AdminDashboardPage() {
 
             {activeTab === 'admins' && (
               <AdminManagement
+                currentUser={currentUser}
+                searchQuery={searchQuery}
+              />
+            )}
+
+            {activeTab === 'security' && (
+              <Security2FAManagement
                 currentUser={currentUser}
                 searchQuery={searchQuery}
               />

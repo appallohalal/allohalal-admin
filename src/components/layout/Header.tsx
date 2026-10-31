@@ -47,6 +47,10 @@ const TAB_TITLES: Record<NavTab, { title: string; desc: string }> = {
     title: 'Admins',
     desc: 'Team and roles',
   },
+  security: {
+    title: 'Security & 2FA Management',
+    desc: 'Two-factor authentication, secret keys, and access security',
+  },
   admob: {
     title: 'AdMob',
     desc: 'Ad unit configuration',

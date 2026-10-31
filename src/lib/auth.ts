@@ -94,15 +94,28 @@ export const getStoredAuthUser = async (): Promise<AdminUser | null> => {
     } = await supabase.auth.getSession();
 
     if (session?.user) {
-      // Verify if account requires Level 2 Authenticator Assurance (2FA)
+      if (session.user.user_metadata?.account_type === 'mobile_user') {
+        return null;
+      }
+
+      // Check if 2FA is active for this account
       try {
-        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
-          // User has enrolled 2FA but current session has not passed 2FA verification yet
-          return null;
+        const res = await fetch(`/api/v1/auth/2fa/status?userId=${session.user.id}`);
+        if (res.ok) {
+          const status = await res.json();
+          if (status.isEnabled) {
+            // Check if current browser session passed 2FA verification
+            const isVerified =
+              typeof window !== 'undefined' &&
+              sessionStorage.getItem(`allo_admin_2fa_verified_${session.user.id}`) === 'true';
+
+            if (!isVerified) {
+              return null; // Require 2FA verification
+            }
+          }
         }
-      } catch (aalErr) {
-        console.warn('MFA assurance level check warning:', aalErr);
+      } catch (checkErr) {
+        console.warn('2FA verification check warning:', checkErr);
       }
 
       return formatSupabaseUser(session.user);
@@ -143,40 +156,28 @@ export const loginAdmin = async (
       };
     }
 
-    // Check if 2FA (TOTP) is required for this account
+    // Check if 2FA is required for this account
     try {
-      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
-        const { data: factorsData, error: factorsErr } = await supabase.auth.mfa.listFactors();
-        if (!factorsErr && factorsData) {
-          const verifiedTotp =
-            factorsData.totp?.find((f) => f.status === 'verified') ||
-            factorsData.all?.find((f) => f.status === 'verified' && f.factor_type === 'totp');
-
-          if (verifiedTotp) {
-            const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-              factorId: verifiedTotp.id,
-            });
-
-            if (challengeError || !challengeData) {
-              return {
-                success: false,
-                error: challengeError?.message || 'Failed to initiate 2FA challenge.',
-              };
-            }
-
-            return {
-              success: true,
-              requires2FA: true,
-              factorId: verifiedTotp.id,
-              challengeId: challengeData.id,
-              user: formatSupabaseUser(data.user),
-            };
-          }
+      const res = await fetch(`/api/v1/auth/2fa/status?userId=${data.user.id}`);
+      if (res.ok) {
+        const statusData = await res.json();
+        if (statusData.isEnabled) {
+          return {
+            success: true,
+            requires2FA: true,
+            factorId: data.user.id,
+            challengeId: 'totp',
+            user: formatSupabaseUser(data.user),
+          };
         }
       }
-    } catch (mfaErr: any) {
-      console.warn('MFA check exception during login:', mfaErr);
+    } catch (statusErr) {
+      console.warn('2FA status check warning during login:', statusErr);
+    }
+
+    // Mark as verified for session if 2FA is not active
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`allo_admin_2fa_verified_${data.user.id}`, 'true');
     }
 
     return {
@@ -199,17 +200,29 @@ export const verifyLogin2FA = async (
   }
 
   try {
-    const { error } = await supabase.auth.mfa.verify({
-      factorId,
-      challengeId,
-      code: code.trim(),
+    const res = await fetch('/api/v1/auth/2fa/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id || factorId,
+        code: code.trim(),
+        isSetup: false,
+        actorEmail: user.email,
+        actorRole: user.role,
+      }),
     });
 
-    if (error) {
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
       return {
         success: false,
-        error: error.message || 'Invalid 2FA code. Please check your authenticator app and try again.',
+        error: data.error || 'Invalid 2FA code. Please check your authenticator app and try again.',
       };
+    }
+
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`allo_admin_2fa_verified_${user.id || factorId}`, 'true');
     }
 
     return {
@@ -276,6 +289,12 @@ export const registerAdmin = async (
 
 export const logoutAdmin = async (): Promise<void> => {
   try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.user && typeof window !== 'undefined') {
+      sessionStorage.removeItem(`allo_admin_2fa_verified_${session.user.id}`);
+    }
     await supabase.auth.signOut();
   } catch (err) {
     console.warn('Supabase logout error:', err);
@@ -288,33 +307,44 @@ export const logoutAdmin = async (): Promise<void> => {
 
 export const checkCurrentUserMFA = async (): Promise<{
   isEnabled: boolean;
+  status?: string;
+  setupAt?: string | null;
   factors: MFAFactorInfo[];
   verifiedFactorId?: string;
 }> => {
   try {
-    const { data, error } = await supabase.auth.mfa.listFactors();
-    if (error || !data) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user) {
       return { isEnabled: false, factors: [] };
     }
 
-    const verifiedTotp = data.all?.find(
-      (f) => f.status === 'verified' && f.factor_type === 'totp'
-    );
-
-    return {
-      isEnabled: Boolean(verifiedTotp),
-      factors: (data.all || []).map((f) => ({
-        id: f.id,
-        factorType: f.factor_type,
-        status: f.status as 'verified' | 'unverified',
-        friendlyName: f.friendly_name,
-      })),
-      verifiedFactorId: verifiedTotp?.id,
-    };
+    const res = await fetch(`/api/v1/auth/2fa/status?userId=${session.user.id}`);
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        isEnabled: Boolean(data.isEnabled),
+        status: data.status,
+        setupAt: data.setupAt,
+        factors: data.isEnabled
+          ? [
+              {
+                id: session.user.id,
+                factorType: 'totp',
+                status: 'verified',
+                friendlyName: 'Allo Halal Authenticator',
+              },
+            ]
+          : [],
+        verifiedFactorId: session.user.id,
+      };
+    }
   } catch (err) {
     console.warn('Error checking MFA status:', err);
-    return { isEnabled: false, factors: [] };
   }
+  return { isEnabled: false, factors: [] };
 };
 
 export const enrollTOTP = async (
@@ -329,55 +359,38 @@ export const enrollTOTP = async (
   error?: string;
 }> => {
   try {
-    // Unenroll any pending unverified factors first to keep factors clean
-    const { data: existing } = await supabase.auth.mfa.listFactors();
-    if (existing?.all) {
-      for (const f of existing.all) {
-        if (f.status === 'unverified') {
-          await supabase.auth.mfa.unenroll({ factorId: f.id }).catch(() => {});
-        }
-      }
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      return { success: false, error: 'User session not found.' };
     }
 
-    const { data, error } = await supabase.auth.mfa.enroll({
-      factorType: 'totp',
-      friendlyName,
-      issuer,
+    const res = await fetch('/api/v1/auth/2fa/setup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: session.user.id,
+        email: session.user.email,
+        actorId: session.user.id,
+        actorEmail: session.user.email,
+        actorRole: session.user.user_metadata?.role || 'Halal Auditor',
+      }),
     });
 
-    if (error || !data) {
-      return { success: false, error: error?.message || 'Failed to enroll 2FA factor.' };
-    }
+    const data = await res.json();
 
-    const secret = data.totp?.secret || '';
-    const { data: sessionData } = await supabase.auth.getSession();
-    const userEmail = sessionData?.session?.user?.email || 'admin@allo-halal.com';
-
-    // Standard TOTP URI format recognized by Google Authenticator, Authy, Apple Keychain
-    const customUri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(userEmail)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
-
-    // Generate high-resolution, branded QR code
-    let qrCode = data.totp?.qr_code;
-    try {
-      qrCode = await QRCode.toDataURL(customUri, {
-        errorCorrectionLevel: 'M',
-        margin: 2,
-        width: 260,
-        color: {
-          dark: '#0f172a',
-          light: '#ffffff',
-        },
-      });
-    } catch (qrErr) {
-      console.warn('Custom QR generation fallback:', qrErr);
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || 'Failed to initialize 2FA setup.' };
     }
 
     return {
       success: true,
-      factorId: data.id,
-      qrCode,
-      secret,
-      uri: customUri,
+      factorId: session.user.id,
+      qrCode: data.qrCode,
+      secret: data.secret,
+      uri: data.uri,
     };
   } catch (err: any) {
     return { success: false, error: err.message || 'Error during 2FA enrollment.' };
@@ -393,28 +406,27 @@ export const verifyAndActivateTOTP = async (
   }
 
   try {
-    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
-      factorId,
+    const res = await fetch('/api/v1/auth/2fa/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: factorId,
+        code: code.trim(),
+        isSetup: true,
+      }),
     });
 
-    if (challengeError || !challenge) {
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
       return {
         success: false,
-        error: challengeError?.message || 'Failed to initiate 2FA verification challenge.',
+        error: data.error || 'Invalid verification code. Please check your authenticator app.',
       };
     }
 
-    const { error: verifyError } = await supabase.auth.mfa.verify({
-      factorId,
-      challengeId: challenge.id,
-      code: code.trim(),
-    });
-
-    if (verifyError) {
-      return {
-        success: false,
-        error: verifyError.message || 'Invalid verification code. Please check your app.',
-      };
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`allo_admin_2fa_verified_${factorId}`, 'true');
     }
 
     return { success: true };
@@ -427,10 +439,29 @@ export const disableTOTP = async (
   factorId: string
 ): Promise<{ success: boolean; error?: string }> => {
   try {
-    const { error } = await supabase.auth.mfa.unenroll({ factorId });
-    if (error) {
-      return { success: false, error: error.message };
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const currentUserId = session?.user?.id || factorId;
+
+    const res = await fetch('/api/v1/auth/2fa/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetUserId: factorId,
+        actorId: currentUserId,
+        enable: false,
+        reason: 'Disabled by user from 2FA settings modal',
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || 'Failed to disable 2FA.' };
     }
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Failed to disable 2FA.' };

@@ -347,17 +347,31 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={() => setIs2FAModalOpen(true)}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
-            currentAdmin2FAEnabled
-              ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-              : 'bg-[#088839] hover:bg-[#066d2e] text-white shadow-md shadow-[#088839]/20 hover:scale-[1.01]'
-          }`}
-        >
-          <KeyRound className="w-4 h-4" />
-          <span>{currentAdmin2FAEnabled ? 'Manage 2FA' : 'Enable 2FA Protection'}</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.hash = '#security';
+              }
+            }}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold border border-emerald-200 text-emerald-800 hover:bg-emerald-50 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Security & 2FA Center</span>
+          </button>
+
+          <button
+            onClick={() => setIs2FAModalOpen(true)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              currentAdmin2FAEnabled
+                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                : 'bg-[#088839] hover:bg-[#066d2e] text-white shadow-md shadow-[#088839]/20 hover:scale-[1.01]'
+            }`}
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>{currentAdmin2FAEnabled ? 'My 2FA Settings' : 'Enable 2FA'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Overview */}

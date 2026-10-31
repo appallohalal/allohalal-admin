@@ -344,4 +344,34 @@ export interface CmsSettings {
   updatedBy: string;
 }
 
+export interface AdminSecurityUser {
+  id: string;
+  email: string;
+  name: string;
+  role: 'Super Admin' | 'Chief Auditor' | 'Halal Auditor' | 'System Admin';
+  roleCategory: 'Admin' | 'Moderator';
+  avatarInitials: string;
+  createdAt: string;
+  lastSignInAt: string | null;
+  is2FAEnabled: boolean;
+  twoFactorStatus: 'active' | 'disabled' | 'pending_setup';
+  twoFactorSetupAt: string | null;
+  isLocked?: boolean;
+}
+
+export interface SecurityAuditLog {
+  id: string;
+  event_type: string;
+  actor_id?: string | null;
+  actor_email?: string | null;
+  actor_role?: string | null;
+  target_user_id?: string | null;
+  target_user_email?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  details?: Record<string, any>;
+  created_at: string;
+}
+
+
 

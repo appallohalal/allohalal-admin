@@ -217,7 +217,16 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({
                   prompted for your password and a 6-digit authenticator code.
                 </p>
 
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
+                  <button
+                    onClick={handleStartEnroll}
+                    disabled={isLoading}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <KeyRound className="w-4 h-4 text-emerald-400" />
+                    <span>Reconfigure Authenticator App</span>
+                  </button>
+
                   <button
                     onClick={handleDisable2FA}
                     disabled={isLoading}

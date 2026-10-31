@@ -19,7 +19,7 @@ import {
 
 import { APP_COLORS } from '@/lib/colors';
 
-export type NavTab = 'dashboard' | 'products' | 'contributions' | 'additives' | 'cms' | 'users' | 'admins' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
+export type NavTab = 'dashboard' | 'products' | 'contributions' | 'additives' | 'cms' | 'users' | 'admins' | 'security' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -84,6 +84,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
       label: 'Admins',
       sublabel: 'Staff & Roles',
       icon: UserCog,
+    },
+    {
+      id: 'security' as NavTab,
+      label: 'Security & 2FA',
+      sublabel: '2FA Management',
+      icon: ShieldCheck,
     },
     {
       id: 'admob' as NavTab,

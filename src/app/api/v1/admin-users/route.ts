@@ -31,9 +31,15 @@ export async function GET() {
         COALESCE(u.raw_user_meta_data->>'role', 'Halal Auditor') as role,
         u.created_at,
         u.last_sign_in_at,
-        EXISTS(
-          SELECT 1 FROM auth.mfa_factors f 
-          WHERE f.user_id = u.id AND f.status = 'verified'
+        (
+          EXISTS(
+            SELECT 1 FROM public.admin_2fa_factors af 
+            WHERE af.user_id = u.id AND af.is_enabled = TRUE AND af.status = 'active'
+          )
+          OR EXISTS(
+            SELECT 1 FROM auth.mfa_factors f 
+            WHERE f.user_id = u.id AND f.status = 'verified'
+          )
         ) as is_2fa_enabled
       FROM auth.users u
       WHERE COALESCE(u.raw_user_meta_data->>'account_type', 'admin') != 'mobile_user'
@@ -162,7 +168,25 @@ export async function PATCH(req: NextRequest) {
 
     // Reset 2FA action for Super Admin
     if (action === 'reset_2fa') {
-      await dbPool.query('DELETE FROM auth.mfa_factors WHERE user_id = $1;', [id]);
+      await dbPool.query(`
+        UPDATE public.admin_2fa_factors 
+        SET 
+          is_enabled = FALSE,
+          status = 'pending_setup',
+          secret_encrypted = '',
+          secret_iv = '',
+          secret_tag = '',
+          temp_secret_encrypted = NULL,
+          temp_secret_iv = NULL,
+          temp_secret_tag = NULL,
+          temp_created_at = NULL,
+          setup_at = NULL,
+          failed_attempts = 0,
+          locked_until = NULL,
+          updated_at = NOW()
+        WHERE user_id = $1;
+      `, [id]);
+      await dbPool.query('DELETE FROM auth.mfa_factors WHERE user_id = $1;', [id]).catch(() => {});
       return NextResponse.json({ success: true, message: '2FA has been successfully reset for this admin user.' });
     }
 

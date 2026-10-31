@@ -650,6 +650,64 @@ ALTER TABLE public.push_notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for push_notifications" ON public.push_notifications;
 CREATE POLICY "Allow all for push_notifications" ON public.push_notifications FOR ALL USING (true) WITH CHECK (true);
 
+-- ==============================================================================
+-- 18. Security & Two-Factor Authentication (2FA / TOTP) Management
+-- RFC 6238 Compliant, AES-256-GCM Encrypted at Rest, Audit Logged
+-- ==============================================================================
+
+-- 18.1 Admin 2FA Factors Table
+CREATE TABLE IF NOT EXISTS public.admin_2fa_factors (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  secret_encrypted TEXT NOT NULL,
+  secret_iv TEXT NOT NULL,
+  secret_tag TEXT NOT NULL,
+  is_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+  status VARCHAR(32) DEFAULT 'pending_setup' NOT NULL, -- 'active', 'disabled', 'pending_setup', 'revoked'
+  setup_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  last_verified_step BIGINT DEFAULT 0,
+  failed_attempts INT DEFAULT 0,
+  locked_until TIMESTAMPTZ,
+  temp_secret_encrypted TEXT,
+  temp_secret_iv TEXT,
+  temp_secret_tag TEXT,
+  temp_created_at TIMESTAMPTZ,
+  UNIQUE(user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_2fa_user ON public.admin_2fa_factors(user_id);
+CREATE INDEX IF NOT EXISTS idx_admin_2fa_status ON public.admin_2fa_factors(status);
+
+ALTER TABLE public.admin_2fa_factors ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for admin_2fa_factors" ON public.admin_2fa_factors;
+CREATE POLICY "Allow all for admin_2fa_factors" ON public.admin_2fa_factors FOR ALL USING (true) WITH CHECK (true);
+
+-- 18.2 Security Audit Logs Table
+CREATE TABLE IF NOT EXISTS public.security_audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type VARCHAR(64) NOT NULL,
+  actor_id UUID,
+  actor_email VARCHAR(255),
+  actor_role VARCHAR(64),
+  target_user_id UUID,
+  target_user_email VARCHAR(255),
+  ip_address VARCHAR(128),
+  user_agent TEXT,
+  details JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sec_audit_created ON public.security_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sec_audit_event ON public.security_audit_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_sec_audit_target ON public.security_audit_logs(target_user_id);
+
+ALTER TABLE public.security_audit_logs ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for security_audit_logs" ON public.security_audit_logs;
+CREATE POLICY "Allow all for security_audit_logs" ON public.security_audit_logs FOR ALL USING (true) WITH CHECK (true);
+
+
 
 
 
