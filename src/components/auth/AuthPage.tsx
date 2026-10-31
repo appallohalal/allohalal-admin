@@ -158,10 +158,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
       <div className="max-w-md w-full bg-white border border-slate-200 rounded-3xl shadow-xl p-8 space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex w-16 h-16 rounded-2xl overflow-hidden bg-[#088839] items-center justify-center shadow-lg shadow-[#088839]/25 mb-1">
-            <img src="/logo.png" alt="Allo Halal" className="w-full h-full object-cover" />
-          </div>
-
           {requires2FA ? (
             <>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] font-bold text-emerald-800">

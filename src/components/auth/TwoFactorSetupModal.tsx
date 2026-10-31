@@ -395,3 +395,4 @@ export const TwoFactorSetupModal: React.FC<TwoFactorSetupModalProps> = ({
     </div>
   );
 };
+
