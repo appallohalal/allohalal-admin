@@ -23,3 +23,4 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
     </div>
   );
 };
+
