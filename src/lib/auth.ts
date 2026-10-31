@@ -2,6 +2,7 @@
 
 import { supabase } from './supabase';
 import { User as SupabaseUser } from '@supabase/supabase-js';
+import QRCode from 'qrcode';
 
 export interface AdminUser {
   id: string;
@@ -317,7 +318,8 @@ export const checkCurrentUserMFA = async (): Promise<{
 };
 
 export const enrollTOTP = async (
-  friendlyName: string = 'Allo Halal Admin Authenticator'
+  friendlyName: string = 'Allo Halal Admin',
+  issuer: string = 'Allo Halal Admin'
 ): Promise<{
   success: boolean;
   factorId?: string;
@@ -340,18 +342,42 @@ export const enrollTOTP = async (
     const { data, error } = await supabase.auth.mfa.enroll({
       factorType: 'totp',
       friendlyName,
+      issuer,
     });
 
     if (error || !data) {
       return { success: false, error: error?.message || 'Failed to enroll 2FA factor.' };
     }
 
+    const secret = data.totp?.secret || '';
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userEmail = sessionData?.session?.user?.email || 'admin@allo-halal.com';
+
+    // Standard TOTP URI format recognized by Google Authenticator, Authy, Apple Keychain
+    const customUri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(userEmail)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+
+    // Generate high-resolution, branded QR code
+    let qrCode = data.totp?.qr_code;
+    try {
+      qrCode = await QRCode.toDataURL(customUri, {
+        errorCorrectionLevel: 'M',
+        margin: 2,
+        width: 260,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff',
+        },
+      });
+    } catch (qrErr) {
+      console.warn('Custom QR generation fallback:', qrErr);
+    }
+
     return {
       success: true,
       factorId: data.id,
-      qrCode: data.totp?.qr_code,
-      secret: data.totp?.secret,
-      uri: data.totp?.uri,
+      qrCode,
+      secret,
+      uri: customUri,
     };
   } catch (err: any) {
     return { success: false, error: err.message || 'Error during 2FA enrollment.' };
