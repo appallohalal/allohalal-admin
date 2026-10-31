@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDbPool } from '@/lib/totp';
+import { getDbPool, ensure2FATables } from '@/lib/totp';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,6 +14,8 @@ export async function GET(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    await ensure2FATables(db);
 
     let query = `
       SELECT 

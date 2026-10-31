@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   getDbPool,
+  ensure2FATables,
   decryptSecret,
   verifyTOTP,
   logSecurityAuditEvent,
@@ -33,6 +34,8 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    await ensure2FATables(db);
 
     // Retrieve user and their 2FA factor record
     const factorRes = await db.query(

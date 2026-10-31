@@ -1,50 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Pool } from 'pg';
 import { supabase } from '@/lib/supabase';
 import { sendRegistrationWelcomeEmail } from '@/lib/email';
+import { getDbPool, ensure2FATables } from '@/lib/totp';
 
-let pool: Pool | null = null;
-
-function getPool() {
-  if (!pool && process.env.DATABASE_URL) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-    });
-  }
-  return pool;
-}
+const getPool = getDbPool;
 
 // GET all admin team users
 export async function GET() {
   try {
-    const dbPool = getPool();
+    const dbPool = getDbPool();
     if (!dbPool) {
       return NextResponse.json({ success: false, error: 'Database connection missing' }, { status: 500 });
     }
 
-    const res = await dbPool.query(`
-      SELECT 
-        u.id,
-        u.email,
-        u.raw_user_meta_data->>'name' as name,
-        COALESCE(u.raw_user_meta_data->>'role', 'Halal Auditor') as role,
-        u.created_at,
-        u.last_sign_in_at,
-        (
-          EXISTS(
-            SELECT 1 FROM public.admin_2fa_factors af 
-            WHERE af.user_id = u.id AND af.is_enabled = TRUE AND af.status = 'active'
-          )
-          OR EXISTS(
-            SELECT 1 FROM auth.mfa_factors f 
-            WHERE f.user_id = u.id AND f.status = 'verified'
-          )
-        ) as is_2fa_enabled
-      FROM auth.users u
-      WHERE COALESCE(u.raw_user_meta_data->>'account_type', 'admin') != 'mobile_user'
-      ORDER BY u.created_at ASC;
-    `);
+    // Ensure 2FA tables exist before querying
+    await ensure2FATables(dbPool);
+
+    let res;
+    try {
+      res = await dbPool.query(`
+        SELECT 
+          u.id,
+          u.email,
+          u.raw_user_meta_data->>'name' as name,
+          COALESCE(u.raw_user_meta_data->>'role', 'Halal Auditor') as role,
+          u.created_at,
+          u.last_sign_in_at,
+          (
+            EXISTS(
+              SELECT 1 FROM public.admin_2fa_factors af 
+              WHERE af.user_id = u.id AND af.is_enabled = TRUE AND af.status = 'active'
+            )
+            OR EXISTS(
+              SELECT 1 FROM auth.mfa_factors f 
+              WHERE f.user_id = u.id AND f.status = 'verified'
+            )
+          ) as is_2fa_enabled
+        FROM auth.users u
+        WHERE COALESCE(u.raw_user_meta_data->>'account_type', 'admin') != 'mobile_user'
+        ORDER BY u.created_at ASC;
+      `);
+    } catch (queryErr: any) {
+      // If table still doesn't exist, fallback query without admin_2fa_factors join
+      if (queryErr.code === '42P01' || queryErr.message?.includes('admin_2fa_factors')) {
+        res = await dbPool.query(`
+          SELECT 
+            u.id,
+            u.email,
+            u.raw_user_meta_data->>'name' as name,
+            COALESCE(u.raw_user_meta_data->>'role', 'Halal Auditor') as role,
+            u.created_at,
+            u.last_sign_in_at,
+            EXISTS(
+              SELECT 1 FROM auth.mfa_factors f 
+              WHERE f.user_id = u.id AND f.status = 'verified'
+            ) as is_2fa_enabled
+          FROM auth.users u
+          WHERE COALESCE(u.raw_user_meta_data->>'account_type', 'admin') != 'mobile_user'
+          ORDER BY u.created_at ASC;
+        `);
+      } else {
+        throw queryErr;
+      }
+    }
 
     const admins = res.rows.map((row) => {
       const name = row.name || row.email?.split('@')[0] || 'Admin';

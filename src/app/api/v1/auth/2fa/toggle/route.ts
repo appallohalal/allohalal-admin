@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDbPool, logSecurityAuditEvent } from '@/lib/totp';
+import { getDbPool, ensure2FATables, logSecurityAuditEvent } from '@/lib/totp';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    await ensure2FATables(db);
 
     // 1. Authorization: verify actor is authorized Main Administrator (Super Admin)
     let actorEmail = 'superadmin@allo-halal.com';

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDbPool } from '@/lib/totp';
+import { getDbPool, ensure2FATables } from '@/lib/totp';
 
 export async function GET() {
   try {
@@ -10,6 +10,8 @@ export async function GET() {
         { status: 500 }
       );
     }
+
+    await ensure2FATables(db);
 
     const query = `
       SELECT 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import {
   getDbPool,
+  ensure2FATables,
   generateBase32Secret,
   encryptSecret,
   getAuthenticatorUri,
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    await ensure2FATables(db);
 
     // Verify user exists in auth.users
     const userRes = await db.query(
