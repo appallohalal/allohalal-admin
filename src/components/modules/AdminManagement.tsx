@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { AdminUser } from '@/lib/auth';
+import { AdminUser, checkCurrentUserMFA } from '@/lib/auth';
+import { TwoFactorSetupModal } from '@/components/auth/TwoFactorSetupModal';
 import {
   ShieldCheck,
+  ShieldAlert,
   UserPlus,
   Crown,
   Shield,
@@ -18,6 +20,7 @@ import {
   X,
   Search,
   UserCog,
+  KeyRound,
 } from 'lucide-react';
 
 interface AdminMember {
@@ -28,6 +31,7 @@ interface AdminMember {
   avatarInitials: string;
   createdAt: string;
   lastSignInAt: string | null;
+  is2FAEnabled?: boolean;
 }
 
 interface AdminManagementProps {
@@ -48,6 +52,8 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editRoleUser, setEditRoleUser] = useState<AdminMember | null>(null);
   const [deleteConfirmUser, setDeleteConfirmUser] = useState<AdminMember | null>(null);
+  const [is2FAModalOpen, setIs2FAModalOpen] = useState(false);
+  const [currentAdmin2FAEnabled, setCurrentAdmin2FAEnabled] = useState(false);
 
   // New Admin Form fields
   const [newName, setNewName] = useState('');
@@ -78,7 +84,44 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
 
   useEffect(() => {
     fetchAdmins();
+    checkCurrentUserMFA().then((res) => {
+      setCurrentAdmin2FAEnabled(res.isEnabled);
+    });
   }, []);
+
+  const handleResetUser2FA = async (targetAdmin: AdminMember) => {
+    if (
+      !confirm(
+        `Are you sure you want to reset 2FA for "${targetAdmin.name}" (${targetAdmin.email})?\n\nThey will be able to log in with their password and reconfigure their authenticator app.`
+      )
+    ) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/v1/admin-users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: targetAdmin.id,
+          action: 'reset_2fa',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg(`2FA has been successfully reset for ${targetAdmin.name}.`);
+        await fetchAdmins();
+      } else {
+        setError(data.error || 'Failed to reset 2FA.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error resetting 2FA.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -271,6 +314,52 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
         </div>
       )}
 
+      {/* Two-Factor Authentication (2FA) Security Banner */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-xs ${
+              currentAdmin2FAEnabled
+                ? 'bg-emerald-50 text-[#088839] border border-emerald-200'
+                : 'bg-amber-50 text-amber-600 border border-amber-200'
+            }`}
+          >
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-slate-900">Two-Factor Authentication (2FA)</h3>
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  currentAdmin2FAEnabled
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}
+              >
+                {currentAdmin2FAEnabled ? '● Protected' : '○ Recommended'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {currentAdmin2FAEnabled
+                ? 'Your account is secured with Google Authenticator / TOTP. 6-digit verification code is required at each sign in.'
+                : 'Fortify your administrative account against compromised passwords and unauthorized login attempts.'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setIs2FAModalOpen(true)}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            currentAdmin2FAEnabled
+              ? 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              : 'bg-[#088839] hover:bg-[#066d2e] text-white shadow-md shadow-[#088839]/20 hover:scale-[1.01]'
+          }`}
+        >
+          <KeyRound className="w-4 h-4" />
+          <span>{currentAdmin2FAEnabled ? 'Manage 2FA' : 'Enable 2FA Protection'}</span>
+        </button>
+      </div>
+
       {/* Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -324,6 +413,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                 <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500 tracking-wider">
                   <th className="py-3 px-4">User</th>
                   <th className="py-3 px-4">Role & Access</th>
+                  <th className="py-3 px-4">2FA Security</th>
                   <th className="py-3 px-4">Created Date</th>
                   <th className="py-3 px-4">Last Active</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -359,6 +449,20 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                         {getRoleBadge(admin.role)}
                       </td>
 
+                      <td className="py-3.5 px-4">
+                        {admin.is2FAEnabled ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            <span>2FA Active</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                            <ShieldAlert className="w-3 h-3 text-slate-400" />
+                            <span>2FA Inactive</span>
+                          </span>
+                        )}
+                      </td>
+
                       <td className="py-3.5 px-4 text-slate-500 text-[11px]">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -377,6 +481,16 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
 
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {admin.is2FAEnabled && canEdit && !isCurrent && (
+                            <button
+                              onClick={() => handleResetUser2FA(admin)}
+                              title="Reset 2FA (if auditor lost authenticator app)"
+                              className="px-2 py-1 text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                            >
+                              Reset 2FA
+                            </button>
+                          )}
+
                           <button
                             onClick={() => {
                               setSelectedRole(admin.role);
@@ -606,6 +720,16 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
           </div>
         </div>
       )}
+
+      {/* Two-Factor Authentication (2FA) Modal */}
+      <TwoFactorSetupModal
+        isOpen={is2FAModalOpen}
+        onClose={() => setIs2FAModalOpen(false)}
+        onStatusChanged={(enabled) => {
+          setCurrentAdmin2FAEnabled(enabled);
+          fetchAdmins();
+        }}
+      />
     </div>
   );
 };

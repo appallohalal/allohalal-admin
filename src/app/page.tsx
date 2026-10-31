@@ -16,6 +16,7 @@ import { AdMobSettingsView } from '@/components/modules/AdMobSettings';
 import { NotificationManager } from '@/components/modules/NotificationManager';
 import { AppCmsManager } from '@/components/modules/AppCmsManager';
 import { AuthPage } from '@/components/auth/AuthPage';
+import { TwoFactorSetupModal } from '@/components/auth/TwoFactorSetupModal';
 import { AdminUser, getStoredAuthUser, logoutAdmin } from '@/lib/auth';
 
 import {
@@ -86,6 +87,7 @@ export default function AdminDashboardPage() {
   const [cmsSettings, setCmsSettings] = useState<CmsSettings>(DEFAULT_CMS_SETTINGS);
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [is2FAModalOpen, setIs2FAModalOpen] = useState(false);
 
   // Restore and sync active tab from URL hash and localStorage
   useEffect(() => {
@@ -357,6 +359,7 @@ export default function AdminDashboardPage() {
           onSearchChange={setSearchQuery}
           currentUser={currentUser}
           onLogout={handleLogout}
+          onOpen2FA={() => setIs2FAModalOpen(true)}
         />
 
         {/* ONLY this main element scrolls vertically */}
@@ -482,6 +485,11 @@ export default function AdminDashboardPage() {
           </div>
         </main>
       </div>
+
+      <TwoFactorSetupModal
+        isOpen={is2FAModalOpen}
+        onClose={() => setIs2FAModalOpen(false)}
+      />
 
       <ToastContainer />
     </div>

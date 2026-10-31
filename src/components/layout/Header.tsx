@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, LogOut } from 'lucide-react';
+import { Search, LogOut, ShieldCheck } from 'lucide-react';
 import { NavTab } from './Sidebar';
 import { AdminUser } from '@/lib/auth';
 
@@ -11,6 +11,7 @@ interface HeaderProps {
   onSearchChange: (q: string) => void;
   currentUser?: AdminUser | null;
   onLogout?: () => void;
+  onOpen2FA?: () => void;
 }
 
 const TAB_TITLES: Record<NavTab, { title: string; desc: string }> = {
@@ -70,6 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange,
   currentUser,
   onLogout,
+  onOpen2FA,
 }) => {
   const current = TAB_TITLES[activeTab] || { title: 'Dashboard', desc: '' };
 
@@ -108,6 +110,17 @@ export const Header: React.FC<HeaderProps> = ({
               <span>{currentUser?.role || 'Halal Certification Board'}</span>
             </div>
           </div>
+
+          {/* 2FA Security Button */}
+          {onOpen2FA && (
+            <button
+              onClick={onOpen2FA}
+              title="Two-Factor Authentication (2FA) Security Settings"
+              className="ml-1 p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
+            >
+              <ShieldCheck className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Logout Button */}
           {onLogout && (

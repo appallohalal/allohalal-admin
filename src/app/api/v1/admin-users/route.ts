@@ -25,15 +25,19 @@ export async function GET() {
 
     const res = await dbPool.query(`
       SELECT 
-        id,
-        email,
-        raw_user_meta_data->>'name' as name,
-        COALESCE(raw_user_meta_data->>'role', 'Halal Auditor') as role,
-        created_at,
-        last_sign_in_at
-      FROM auth.users
-      WHERE COALESCE(raw_user_meta_data->>'account_type', 'admin') != 'mobile_user'
-      ORDER BY created_at ASC;
+        u.id,
+        u.email,
+        u.raw_user_meta_data->>'name' as name,
+        COALESCE(u.raw_user_meta_data->>'role', 'Halal Auditor') as role,
+        u.created_at,
+        u.last_sign_in_at,
+        EXISTS(
+          SELECT 1 FROM auth.mfa_factors f 
+          WHERE f.user_id = u.id AND f.status = 'verified'
+        ) as is_2fa_enabled
+      FROM auth.users u
+      WHERE COALESCE(u.raw_user_meta_data->>'account_type', 'admin') != 'mobile_user'
+      ORDER BY u.created_at ASC;
     `);
 
     const admins = res.rows.map((row) => {
@@ -54,6 +58,7 @@ export async function GET() {
         avatarInitials: initials,
         createdAt: row.created_at,
         lastSignInAt: row.last_sign_in_at,
+        is2FAEnabled: Boolean(row.is_2fa_enabled),
       };
     });
 
@@ -140,10 +145,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH update admin user role or name
+// PATCH update admin user role or name, or reset 2FA
 export async function PATCH(req: NextRequest) {
   try {
-    const { id, role, name } = await req.json();
+    const body = await req.json();
+    const { id, role, name, action } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
@@ -152,6 +158,12 @@ export async function PATCH(req: NextRequest) {
     const dbPool = getPool();
     if (!dbPool) {
       return NextResponse.json({ success: false, error: 'Database connection missing' }, { status: 500 });
+    }
+
+    // Reset 2FA action for Super Admin
+    if (action === 'reset_2fa') {
+      await dbPool.query('DELETE FROM auth.mfa_factors WHERE user_id = $1;', [id]);
+      return NextResponse.json({ success: true, message: '2FA has been successfully reset for this admin user.' });
     }
 
     let query = '';
