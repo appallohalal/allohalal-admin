@@ -17,7 +17,13 @@ import { NotificationManager } from '@/components/modules/NotificationManager';
 import { AppCmsManager } from '@/components/modules/AppCmsManager';
 import { AuthPage } from '@/components/auth/AuthPage';
 import { TwoFactorSetupModal } from '@/components/auth/TwoFactorSetupModal';
-import { AdminUser, getStoredAuthUser, logoutAdmin } from '@/lib/auth';
+import { LoadingScreen } from '@/components/common/LoadingScreen';
+import {
+  AdminUser,
+  getStoredAuthUser,
+  logoutAdmin,
+  checkAuthSetupStatus,
+} from '@/lib/auth';
 
 import {
   fetchProducts,
@@ -88,6 +94,7 @@ export default function AdminDashboardPage() {
   const [contributions, setContributions] = useState<Contribution[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [is2FAModalOpen, setIs2FAModalOpen] = useState(false);
+  const [isFirstUser, setIsFirstUser] = useState<boolean | null>(null);
 
   // Restore and sync active tab from URL hash and localStorage
   useEffect(() => {
@@ -130,18 +137,10 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Initialize data and real Supabase Auth session on mount
-  useEffect(() => {
-    let isMounted = true;
-
-    async function initAuthAndData() {
-      try {
-        const user = await getStoredAuthUser();
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-
-        const [prods, adds, usrs, adList, logList, admob, groq, authSet, cmsSet, contribs] = await Promise.all([
+  const loadDashboardData = async () => {
+    try {
+      const [prods, adds, usrs, adList, logList, admob, groq, authSet, cmsSet, contribs] =
+        await Promise.all([
           fetchProducts(),
           fetchAdditives(),
           fetchUsers(),
@@ -153,20 +152,42 @@ export default function AdminDashboardPage() {
           fetchCmsSettings(),
           fetchContributions(),
         ]);
-        if (isMounted) {
-          setProducts(prods);
-          setAdditives(adds);
-          setUsers(usrs);
-          setAds(adList);
-          setLogs(logList);
-          setAdmobSettings(admob);
-          setGroqSettings(groq);
-          setAuthSettings(authSet);
-          setCmsSettings(cmsSet);
-          setContributions(contribs);
+      setProducts(prods);
+      setAdditives(adds);
+      setUsers(usrs);
+      setAds(adList);
+      setLogs(logList);
+      setAdmobSettings(admob);
+      setGroqSettings(groq);
+      setAuthSettings(authSet);
+      setCmsSettings(cmsSet);
+      setContributions(contribs);
+    } catch (err) {
+      console.error('Error loading Supabase dashboard data:', err);
+    }
+  };
+
+  // Initialize data and real Supabase Auth session on mount
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initAuthAndData() {
+      try {
+        const [user, setupStatus] = await Promise.all([
+          getStoredAuthUser(),
+          checkAuthSetupStatus().catch(() => ({ isFirstUser: false, userCount: 1 })),
+        ]);
+
+        if (!isMounted) return;
+
+        setIsFirstUser(setupStatus.isFirstUser);
+
+        if (user) {
+          setCurrentUser(user);
+          await loadDashboardData();
         }
       } catch (err) {
-        console.error('Error loading Supabase data:', err);
+        console.error('Error loading initial session:', err);
       } finally {
         if (isMounted) {
           setIsLoaded(true);
@@ -318,19 +339,22 @@ export default function AdminDashboardPage() {
   };
 
   if (!isLoaded) {
-    return (
-      <div className="h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-emerald-600">
-          <div className="w-5 h-5 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-semibold text-slate-700">Loading...</span>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Loading Allo Halal Admin..." />;
   }
 
   // If user is not authenticated, show Login & Register view
   if (!currentUser) {
-    return <AuthPage onAuthSuccess={(user) => setCurrentUser(user)} />;
+    return (
+      <AuthPage
+        initialIsFirstUser={isFirstUser}
+        onAuthSuccess={async (user) => {
+          setIsLoaded(false);
+          setCurrentUser(user);
+          await loadDashboardData();
+          setIsLoaded(true);
+        }}
+      />
+    );
   }
 
   // Sidebar live counts

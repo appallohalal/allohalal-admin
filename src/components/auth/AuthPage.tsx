@@ -20,14 +20,20 @@ import {
   verifyLogin2FA,
   logoutAdmin,
 } from '@/lib/auth';
+import { LoadingScreen } from '@/components/common/LoadingScreen';
 
 interface AuthPageProps {
   onAuthSuccess: (user: AdminUser) => void;
+  initialIsFirstUser?: boolean | null;
 }
 
-export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
-  const [isFirstUser, setIsFirstUser] = useState<boolean | null>(null);
-  const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>('LOGIN');
+export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess, initialIsFirstUser }) => {
+  const [isFirstUser, setIsFirstUser] = useState<boolean | null>(
+    initialIsFirstUser !== undefined ? initialIsFirstUser : null
+  );
+  const [mode, setMode] = useState<'LOGIN' | 'REGISTER'>(
+    initialIsFirstUser === true ? 'REGISTER' : 'LOGIN'
+  );
 
   // Form Fields
   const [name, setName] = useState('');
@@ -48,8 +54,12 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
   const totpInputRef = useRef<HTMLInputElement>(null);
 
-  // Check if system has any registered admin users
+  // Check if system has any registered admin users (only if not already provided)
   useEffect(() => {
+    if (initialIsFirstUser !== undefined && initialIsFirstUser !== null) {
+      return;
+    }
+
     let isMounted = true;
     checkAuthSetupStatus().then((status) => {
       if (isMounted) {
@@ -64,7 +74,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [initialIsFirstUser]);
 
   // Auto focus 2FA input when step opens
   useEffect(() => {
@@ -143,14 +153,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onAuthSuccess }) => {
 
   // While checking setup status
   if (isFirstUser === null) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="flex items-center gap-3 text-[#088839]">
-          <div className="w-5 h-5 border-2 border-[#088839] border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm font-semibold text-slate-700">Loading security parameters...</span>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Loading Allo Halal Admin..." />;
   }
 
   return (
