@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     const amount = Number(body.amount || 0);
     const currency = (body.currency || 'EUR').toUpperCase();
     const tier = (body.tier || 'SERVER').toUpperCase();
-    const transactionId = body.transactionId || body.transaction_id || body.stripe_session_id || id;
+    const transactionId = body.transactionId || body.transaction_id || body.paddle_transaction_id || body.stripe_session_id || id;
     const message = body.message || 'Community Contribution via Allo Halal App';
     const status = (body.status || 'COMPLETED').toUpperCase();
 
@@ -62,8 +62,9 @@ export async function POST(request: Request) {
       amount,
       currency,
       tier,
-      payment_method: 'STRIPE',
+      payment_method: 'PADDLE',
       transaction_id: transactionId,
+      paddle_transaction_id: transactionId,
       message,
       status,
       is_anonymous: false,

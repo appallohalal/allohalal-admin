@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint",
-    "db:push": "node scripts/push-schema.js"
+    "lint": "eslint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "@types/pg": "^8.23.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.61.0",

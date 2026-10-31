@@ -20,10 +20,10 @@ function PaymentSuccessContent() {
 
     const confirmPayment = async () => {
       try {
-        const res = await fetch('/api/stripe/confirm-payment', {
+        const res = await fetch('/api/paddle/confirm-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId }),
+          body: JSON.stringify({ transactionId: sessionId }),
         });
 
         const data = await res.json();
@@ -50,7 +50,7 @@ function PaymentSuccessContent() {
             <Loader2 className="w-10 h-10 text-[#088839] animate-spin mx-auto" />
             <h2 className="text-lg font-bold text-slate-800">Verifying Payment...</h2>
             <p className="text-xs text-slate-500">
-              Confirming your contribution with Stripe and updating the ledger.
+              Confirming your contribution with Paddle and updating the ledger.
             </p>
           </div>
         ) : (
@@ -120,7 +120,7 @@ export default function PaymentSuccessPage() {
               <Loader2 className="w-10 h-10 text-[#088839] animate-spin mx-auto" />
               <h2 className="text-lg font-bold text-slate-800">Verifying Payment...</h2>
               <p className="text-xs text-slate-500">
-                Confirming your contribution with Stripe and updating the ledger.
+                Confirming your contribution with Paddle and updating the ledger.
               </p>
             </div>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, PushNotification, NotificationSettings, CmsSettings, CmsTexts, Contribution, DonationStatus, DonationTier } from './types';
+import { Product, Additive, UserAccount, GeoAd, PartnerCategory, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, PushNotification, NotificationSettings, CmsSettings, CmsTexts, Contribution, DonationStatus, DonationTier } from './types';
 import { supabase } from './supabase';
 
 const STORAGE_KEYS = {
@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   ADDITIVES: 'halallens_supabase_additives',
   USERS: 'halallens_supabase_users',
   ADS: 'halallens_supabase_ads',
+  PARTNER_CATEGORIES: 'halallens_supabase_partner_categories',
   LOGS: 'halallens_supabase_logs',
   ADMOB: 'halallens_supabase_admob',
   GROQ_SETTINGS: 'halallens_supabase_groq_settings',
@@ -344,6 +345,7 @@ export const fetchAds = async (): Promise<GeoAd[]> => {
         id: item.id,
         title: item.title,
         sponsorName: item.sponsor_name,
+        category: item.category || 'Restaurant',
         bannerImageUrl: item.banner_image_url,
         targetUrl: item.target_url,
         latitude: item.latitude,
@@ -381,6 +383,7 @@ export const saveGeoAd = async (ad: GeoAd): Promise<GeoAd[]> => {
     const payload: Record<string, any> = {
       title: ad.title,
       sponsor_name: ad.sponsorName,
+      category: ad.category || 'Restaurant',
       banner_image_url: ad.bannerImageUrl,
       target_url: ad.targetUrl,
       latitude: ad.latitude,
@@ -429,6 +432,122 @@ export const toggleAdActive = async (adId: string): Promise<GeoAd[]> => {
   }
 
   return fetchAds();
+};
+
+// ==========================================
+// 4.1. PARTNER CATEGORIES (CRUD)
+// ==========================================
+
+export const DEFAULT_PARTNER_CATEGORIES: PartnerCategory[] = [
+  { id: 'restaurant', name: 'Restaurant', displayOrder: 1, isActive: true },
+  { id: 'butcher', name: 'Boucherie', displayOrder: 2, isActive: true },
+  { id: 'grocery', name: 'Épicerie', displayOrder: 3, isActive: true },
+  { id: 'bakery', name: 'Boulangerie', displayOrder: 4, isActive: true },
+];
+
+export const fetchPartnerCategories = async (): Promise<PartnerCategory[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('partner_categories')
+      .select('*')
+      .order('display_order', { ascending: true });
+
+    if (!error && data && data.length > 0) {
+      const mapped: PartnerCategory[] = data.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        displayOrder: item.display_order ?? 0,
+        isActive: item.is_active !== false,
+        createdAt: item.created_at,
+      }));
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.PARTNER_CATEGORIES, JSON.stringify(mapped));
+      }
+      return mapped;
+    }
+  } catch (err) {
+    console.warn('Supabase categories fetch note:', err);
+  }
+
+  if (typeof window !== 'undefined') {
+    const cached = localStorage.getItem(STORAGE_KEYS.PARTNER_CATEGORIES);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {}
+    }
+  }
+  return DEFAULT_PARTNER_CATEGORIES;
+};
+
+export const savePartnerCategory = async (cat: PartnerCategory): Promise<PartnerCategory[]> => {
+  try {
+    const payload: Record<string, any> = {
+      id: cat.id,
+      name: cat.name.trim(),
+      display_order: cat.displayOrder ?? 0,
+      is_active: cat.isActive !== false,
+      updated_at: new Date().toISOString(),
+    };
+    await supabase.from('partner_categories').upsert(payload);
+  } catch (err) {
+    console.warn('Supabase save category note:', err);
+  }
+
+  const list = await fetchPartnerCategories();
+  const idx = list.findIndex((c) => c.id === cat.id);
+  let updated: PartnerCategory[];
+  if (idx >= 0) {
+    updated = [...list];
+    updated[idx] = { ...updated[idx], ...cat };
+  } else {
+    updated = [...list, cat];
+  }
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEYS.PARTNER_CATEGORIES, JSON.stringify(updated));
+  }
+  return updated;
+};
+
+export const deletePartnerCategory = async (id: string): Promise<PartnerCategory[]> => {
+  try {
+    await supabase.from('partner_categories').delete().eq('id', id);
+  } catch (err) {
+    console.warn('Supabase delete category note:', err);
+  }
+
+  const list = await fetchPartnerCategories();
+  const updated = list.filter((c) => c.id !== id);
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEYS.PARTNER_CATEGORIES, JSON.stringify(updated));
+  }
+  return updated;
+};
+
+export const renamePartnerCategory = async (
+  catId: string,
+  oldName: string,
+  newName: string
+): Promise<PartnerCategory[]> => {
+  const cleanNew = newName.trim();
+  try {
+    await supabase
+      .from('partner_categories')
+      .update({ name: cleanNew, updated_at: new Date().toISOString() })
+      .eq('id', catId);
+
+    if (oldName.trim()) {
+      await supabase
+        .from('geo_ads')
+        .update({ category: cleanNew })
+        .ilike('category', oldName.trim());
+    }
+  } catch (err) {
+    console.warn('Supabase rename category note:', err);
+  }
+
+  return fetchPartnerCategories();
 };
 
 // ==========================================
@@ -523,6 +642,14 @@ export const DEFAULT_ADMOB_SETTINGS: AdMobSettings = {
 };
 
 export const fetchAdMobSettings = async (): Promise<AdMobSettings> => {
+  let cached: Partial<AdMobSettings> = {};
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.ADMOB);
+      if (raw) cached = JSON.parse(raw);
+    } catch (_) {}
+  }
+
   try {
     const { data, error } = await supabase
       .from('admob_settings')
@@ -532,43 +659,43 @@ export const fetchAdMobSettings = async (): Promise<AdMobSettings> => {
 
     if (!error && data) {
       const mapped: AdMobSettings = {
-        id: data.id,
-        adsEnabled: data.ads_enabled ?? true,
-        testMode: data.test_mode ?? true,
-        bannerEnabled: data.banner_enabled ?? true,
-        interstitialEnabled: data.interstitial_enabled ?? true,
-        appOpenEnabled: data.app_open_enabled ?? true,
-        nativeEnabled: data.native_enabled ?? true,
-        rewardedEnabled: data.rewarded_enabled ?? false,
-        interstitialIntervalScans: data.interstitial_interval_scans ?? 3,
-        appOpenCooldownMinutes: data.app_open_cooldown_minutes ?? 15,
-        bannerRefreshRateSeconds: data.banner_refresh_rate_seconds ?? 60,
-        androidAppId: data.android_app_id || data.test_android_app_id || DEFAULT_ADMOB_SETTINGS.androidAppId,
-        androidBannerId: data.android_banner_id || data.test_android_banner_id || DEFAULT_ADMOB_SETTINGS.androidBannerId,
-        androidInterstitialId: data.android_interstitial_id || data.test_android_interstitial_id || DEFAULT_ADMOB_SETTINGS.androidInterstitialId,
-        androidAppOpenId: data.android_app_open_id || data.test_android_app_open_id || DEFAULT_ADMOB_SETTINGS.androidAppOpenId,
-        androidNativeId: data.android_native_id || data.test_android_native_id || DEFAULT_ADMOB_SETTINGS.androidNativeId,
-        androidRewardedId: data.android_rewarded_id || data.test_android_rewarded_id || DEFAULT_ADMOB_SETTINGS.androidRewardedId,
-        iosAppId: data.ios_app_id || '',
-        iosBannerId: data.ios_banner_id || '',
-        iosInterstitialId: data.ios_interstitial_id || '',
-        iosAppOpenId: data.ios_app_open_id || '',
-        iosNativeId: data.ios_native_id || '',
-        iosRewardedId: data.ios_rewarded_id || '',
-        testAndroidAppId: data.test_android_app_id || DEFAULT_ADMOB_SETTINGS.testAndroidAppId,
-        testAndroidBannerId: data.test_android_banner_id || DEFAULT_ADMOB_SETTINGS.testAndroidBannerId,
-        testAndroidInterstitialId: data.test_android_interstitial_id || DEFAULT_ADMOB_SETTINGS.testAndroidInterstitialId,
-        testAndroidAppOpenId: data.test_android_app_open_id || DEFAULT_ADMOB_SETTINGS.testAndroidAppOpenId,
-        testAndroidNativeId: data.test_android_native_id || DEFAULT_ADMOB_SETTINGS.testAndroidNativeId,
-        testAndroidRewardedId: data.test_android_rewarded_id || DEFAULT_ADMOB_SETTINGS.testAndroidRewardedId,
-        testIosAppId: data.test_ios_app_id || DEFAULT_ADMOB_SETTINGS.testIosAppId,
-        testIosBannerId: data.test_ios_banner_id || DEFAULT_ADMOB_SETTINGS.testIosBannerId,
-        testIosInterstitialId: data.test_ios_interstitial_id || DEFAULT_ADMOB_SETTINGS.testIosInterstitialId,
-        testIosAppOpenId: data.test_ios_app_open_id || DEFAULT_ADMOB_SETTINGS.testIosAppOpenId,
-        testIosNativeId: data.test_ios_native_id || DEFAULT_ADMOB_SETTINGS.testIosNativeId,
-        testIosRewardedId: data.test_ios_rewarded_id || DEFAULT_ADMOB_SETTINGS.testIosRewardedId,
+        id: data.id || 'global',
+        adsEnabled: data.ads_enabled ?? cached.adsEnabled ?? true,
+        testMode: data.test_mode ?? cached.testMode ?? false,
+        bannerEnabled: data.banner_enabled ?? cached.bannerEnabled ?? true,
+        interstitialEnabled: data.interstitial_enabled ?? cached.interstitialEnabled ?? true,
+        appOpenEnabled: data.app_open_enabled ?? cached.appOpenEnabled ?? true,
+        nativeEnabled: data.native_enabled ?? cached.nativeEnabled ?? true,
+        rewardedEnabled: data.rewarded_enabled ?? cached.rewardedEnabled ?? false,
+        interstitialIntervalScans: data.interstitial_interval_scans ?? data.interstitial_frequency ?? cached.interstitialIntervalScans ?? 3,
+        appOpenCooldownMinutes: data.app_open_cooldown_minutes ?? cached.appOpenCooldownMinutes ?? 15,
+        bannerRefreshRateSeconds: data.banner_refresh_rate_seconds ?? cached.bannerRefreshRateSeconds ?? 60,
+        androidAppId: data.android_app_id || cached.androidAppId || DEFAULT_ADMOB_SETTINGS.androidAppId,
+        androidBannerId: data.android_banner_id || data.banner_id_android || cached.androidBannerId || DEFAULT_ADMOB_SETTINGS.androidBannerId,
+        androidInterstitialId: data.android_interstitial_id || data.interstitial_id_android || cached.androidInterstitialId || DEFAULT_ADMOB_SETTINGS.androidInterstitialId,
+        androidAppOpenId: data.android_app_open_id || cached.androidAppOpenId || DEFAULT_ADMOB_SETTINGS.androidAppOpenId,
+        androidNativeId: data.android_native_id || cached.androidNativeId || DEFAULT_ADMOB_SETTINGS.androidNativeId,
+        androidRewardedId: data.android_rewarded_id || data.rewarded_id_android || cached.androidRewardedId || DEFAULT_ADMOB_SETTINGS.androidRewardedId,
+        iosAppId: data.ios_app_id || cached.iosAppId || '',
+        iosBannerId: data.ios_banner_id || data.banner_id_ios || cached.iosBannerId || '',
+        iosInterstitialId: data.ios_interstitial_id || data.interstitial_id_ios || cached.iosInterstitialId || '',
+        iosAppOpenId: data.ios_app_open_id || cached.iosAppOpenId || '',
+        iosNativeId: data.ios_native_id || cached.iosNativeId || '',
+        iosRewardedId: data.ios_rewarded_id || data.rewarded_id_ios || cached.iosRewardedId || '',
+        testAndroidAppId: data.test_android_app_id || cached.testAndroidAppId || DEFAULT_ADMOB_SETTINGS.testAndroidAppId,
+        testAndroidBannerId: data.test_android_banner_id || cached.testAndroidBannerId || DEFAULT_ADMOB_SETTINGS.testAndroidBannerId,
+        testAndroidInterstitialId: data.test_android_interstitial_id || cached.testAndroidInterstitialId || DEFAULT_ADMOB_SETTINGS.testAndroidInterstitialId,
+        testAndroidAppOpenId: data.test_android_app_open_id || cached.testAndroidAppOpenId || DEFAULT_ADMOB_SETTINGS.testAndroidAppOpenId,
+        testAndroidNativeId: data.test_android_native_id || cached.testAndroidNativeId || DEFAULT_ADMOB_SETTINGS.testAndroidNativeId,
+        testAndroidRewardedId: data.test_android_rewarded_id || cached.testAndroidRewardedId || DEFAULT_ADMOB_SETTINGS.testAndroidRewardedId,
+        testIosAppId: data.test_ios_app_id || cached.testIosAppId || DEFAULT_ADMOB_SETTINGS.testIosAppId,
+        testIosBannerId: data.test_ios_banner_id || cached.testIosBannerId || DEFAULT_ADMOB_SETTINGS.testIosBannerId,
+        testIosInterstitialId: data.test_ios_interstitial_id || cached.testIosInterstitialId || DEFAULT_ADMOB_SETTINGS.testIosInterstitialId,
+        testIosAppOpenId: data.test_ios_app_open_id || cached.testIosAppOpenId || DEFAULT_ADMOB_SETTINGS.testIosAppOpenId,
+        testIosNativeId: data.test_ios_native_id || cached.testIosNativeId || DEFAULT_ADMOB_SETTINGS.testIosNativeId,
+        testIosRewardedId: data.test_ios_rewarded_id || cached.testIosRewardedId || DEFAULT_ADMOB_SETTINGS.testIosRewardedId,
         updatedAt: data.updated_at || new Date().toISOString(),
-        updatedBy: data.updated_by || 'Admin',
+        updatedBy: data.updated_by || cached.updatedBy || 'Admin',
       };
       if (typeof window !== 'undefined') {
         localStorage.setItem(STORAGE_KEYS.ADMOB, JSON.stringify(mapped));
@@ -592,66 +719,69 @@ export const fetchAdMobSettings = async (): Promise<AdMobSettings> => {
 };
 
 export const saveAdMobSettings = async (settings: AdMobSettings, updatedBy: string = 'Admin'): Promise<AdMobSettings> => {
-  const payload = {
+  const effectiveAndroidAppId = (settings.testMode ? settings.testAndroidAppId : settings.androidAppId).trim() || settings.androidAppId.trim();
+  const effectiveIosAppId = (settings.testMode ? settings.testIosAppId : settings.iosAppId).trim() || settings.iosAppId.trim();
+  const effectiveBannerAndroid = (settings.testMode ? settings.testAndroidBannerId : settings.androidBannerId).trim() || settings.androidBannerId.trim();
+  const effectiveBannerIos = (settings.testMode ? settings.testIosBannerId : settings.iosBannerId).trim() || settings.iosBannerId.trim();
+  const effectiveInterstitialAndroid = (settings.testMode ? settings.testAndroidInterstitialId : settings.androidInterstitialId).trim() || settings.androidInterstitialId.trim();
+  const effectiveInterstitialIos = (settings.testMode ? settings.testIosInterstitialId : settings.iosInterstitialId).trim() || settings.iosInterstitialId.trim();
+  const effectiveRewardedAndroid = (settings.testMode ? settings.testAndroidRewardedId : settings.androidRewardedId).trim() || settings.androidRewardedId.trim();
+  const effectiveRewardedIos = (settings.testMode ? settings.testIosRewardedId : settings.iosRewardedId).trim() || settings.iosRewardedId.trim();
+
+  // 1. Guaranteed schema payload matching live Supabase admob_settings columns
+  const basePayload: Record<string, any> = {
     id: 'global',
     ads_enabled: settings.adsEnabled,
     test_mode: settings.testMode,
     banner_enabled: settings.bannerEnabled,
     interstitial_enabled: settings.interstitialEnabled,
-    app_open_enabled: settings.appOpenEnabled,
-    native_enabled: settings.nativeEnabled,
     rewarded_enabled: settings.rewardedEnabled,
-    interstitial_interval_scans: settings.interstitialIntervalScans,
-    app_open_cooldown_minutes: settings.appOpenCooldownMinutes,
-    banner_refresh_rate_seconds: settings.bannerRefreshRateSeconds,
-    android_app_id: settings.androidAppId.trim(),
-    android_banner_id: settings.androidBannerId.trim(),
-    android_interstitial_id: settings.androidInterstitialId.trim(),
-    android_app_open_id: settings.androidAppOpenId.trim(),
-    android_native_id: settings.androidNativeId.trim(),
-    android_rewarded_id: settings.androidRewardedId.trim(),
-    ios_app_id: settings.iosAppId.trim(),
-    ios_banner_id: settings.iosBannerId.trim(),
-    ios_interstitial_id: settings.iosInterstitialId.trim(),
-    ios_app_open_id: settings.iosAppOpenId.trim(),
-    ios_native_id: settings.iosNativeId.trim(),
-    ios_rewarded_id: settings.iosRewardedId.trim(),
-    test_android_app_id: settings.testAndroidAppId.trim(),
-    test_android_banner_id: settings.testAndroidBannerId.trim(),
-    test_android_interstitial_id: settings.testAndroidInterstitialId.trim(),
-    test_android_app_open_id: settings.testAndroidAppOpenId.trim(),
-    test_android_native_id: settings.testAndroidNativeId.trim(),
-    test_android_rewarded_id: settings.testAndroidRewardedId.trim(),
-    test_ios_app_id: settings.testIosAppId.trim(),
-    test_ios_banner_id: settings.testIosBannerId.trim(),
-    test_ios_interstitial_id: settings.testIosInterstitialId.trim(),
-    test_ios_app_open_id: settings.testIosAppOpenId.trim(),
-    test_ios_native_id: settings.testIosNativeId.trim(),
-    test_ios_rewarded_id: settings.testIosRewardedId.trim(),
+    interstitial_frequency: Number(settings.interstitialIntervalScans || 3),
+    android_app_id: effectiveAndroidAppId,
+    ios_app_id: effectiveIosAppId,
+    banner_id_android: effectiveBannerAndroid,
+    banner_id_ios: effectiveBannerIos,
+    interstitial_id_android: effectiveInterstitialAndroid,
+    interstitial_id_ios: effectiveInterstitialIos,
+    rewarded_id_android: effectiveRewardedAndroid,
+    rewarded_id_ios: effectiveRewardedIos,
     updated_at: new Date().toISOString(),
     updated_by: updatedBy,
   };
 
   try {
-    const { error } = await supabase.from('admob_settings').upsert(payload);
+    const { error } = await supabase.from('admob_settings').upsert(basePayload);
     if (error) {
-      console.error('Error saving AdMob settings to Supabase:', error);
-      throw error;
+      console.warn('Supabase save AdMob settings primary note:', error.message);
+    } else {
+      // 2. Best-effort update for environments that have modern columns (fail-safe, no error throw)
+      try {
+        await supabase.from('admob_settings').update({
+          app_open_enabled: settings.appOpenEnabled,
+          native_enabled: settings.nativeEnabled,
+          interstitial_interval_scans: Number(settings.interstitialIntervalScans || 3),
+          app_open_cooldown_minutes: Number(settings.appOpenCooldownMinutes || 15),
+          banner_refresh_rate_seconds: Number(settings.bannerRefreshRateSeconds || 60),
+          android_app_open_id: settings.androidAppOpenId.trim(),
+          android_native_id: settings.androidNativeId.trim(),
+        }).eq('id', 'global');
+      } catch (_) {}
     }
   } catch (err) {
     console.warn('Supabase save AdMob settings warning:', err);
   }
 
+  const updated: AdMobSettings = {
+    ...settings,
+    updatedAt: basePayload.updated_at,
+    updatedBy,
+  };
+
   if (typeof window !== 'undefined') {
-    const updated: AdMobSettings = {
-      ...settings,
-      updatedAt: payload.updated_at,
-      updatedBy,
-    };
     localStorage.setItem(STORAGE_KEYS.ADMOB, JSON.stringify(updated));
   }
 
-  return fetchAdMobSettings();
+  return updated;
 };
 
 // ==========================================
@@ -810,12 +940,12 @@ export const DEFAULT_AUTH_SETTINGS: AuthSettings = {
   humanitarianText: 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.',
   humanitarianOrganizationName: 'Global Halal Emergency Food Relief',
   humanitarianLearnMoreUrl: 'https://allohalal.fr/humanitarian',
-  enableStripe: true,
-  stripeMode: 'test',
-  stripePublishableKey: 'pk_test_51P9nVoRrokKxR1k7GYpiCd7B9ZVwmR7MBuYx28GmKrRsaOPUHmSMSIESH62ZVDwx6IFlN8xSz7br9cg0LzfLVbrK00uFBuBNzr',
-  stripeSecretKey: '',
-  stripeWebhookSecret: '',
-  stripeCurrency: 'eur',
+  enablePaddle: true,
+  paddleMode: 'sandbox',
+  paddleApiKey: process.env.PADDLE_API_KEY || '',
+  paddleClientToken: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '',
+  paddleWebhookSecret: process.env.PADDLE_WEBHOOK_SECRET || '',
+  paddleCurrency: 'eur',
   updatedAt: new Date().toISOString(),
   updatedBy: 'Admin',
 };
@@ -829,6 +959,21 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
       .maybeSingle();
 
     if (!error && data) {
+      const rawApiKey = (data.paddle_api_key || data.stripe_secret_key || '').trim();
+      const apiKey = (rawApiKey && rawApiKey.startsWith('pdl_'))
+        ? rawApiKey
+        : (DEFAULT_AUTH_SETTINGS.paddleApiKey || '');
+
+      const rawClientToken = (data.paddle_client_token || data.stripe_publishable_key || '').trim();
+      const clientToken = (rawClientToken && !rawClientToken.startsWith('pk_'))
+        ? rawClientToken
+        : (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || DEFAULT_AUTH_SETTINGS.paddleClientToken || '');
+
+      const rawWebhookSec = (data.paddle_webhook_secret || data.stripe_webhook_secret || '').trim();
+      const webhookSecret = (rawWebhookSec && !rawWebhookSec.startsWith('whsec_'))
+        ? rawWebhookSec
+        : (process.env.PADDLE_WEBHOOK_SECRET || DEFAULT_AUTH_SETTINGS.paddleWebhookSecret || '');
+
       const mapped: AuthSettings = {
         id: data.id,
         forceUserAuth: data.force_user_auth === true,
@@ -851,7 +996,11 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
         confirmationEmailTitle: data.confirmation_email_title || DEFAULT_EMAIL_TEMPLATES.confirmationTitle,
         confirmationEmailSubtitle: data.confirmation_email_subtitle || DEFAULT_EMAIL_TEMPLATES.confirmationSubtitle,
         confirmationEmailBody: data.confirmation_email_body || DEFAULT_EMAIL_TEMPLATES.confirmationBody,
-        contributionPresets: Array.isArray(data.contribution_presets) ? data.contribution_presets : [1, 3, 5, 10, 15],
+        contributionPresets: Array.isArray(data.contribution_presets)
+          ? data.contribution_presets
+          : (typeof data.contribution_presets === 'string'
+              ? (() => { try { const p = JSON.parse(data.contribution_presets); return Array.isArray(p) ? p : [1, 3, 5, 10, 15]; } catch (_) { return [1, 3, 5, 10, 15]; } })()
+              : [1, 3, 5, 10, 15]),
         defaultContributionAmount: Number(data.default_contribution_amount || 5),
         minContributionAmount: Number(data.min_contribution_amount || 1),
         maxContributionAmount: Number(data.max_contribution_amount || 50),
@@ -866,12 +1015,12 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
         humanitarianText: data.humanitarian_text || 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.',
         humanitarianOrganizationName: data.humanitarian_organization_name || 'Global Halal Emergency Food Relief',
         humanitarianLearnMoreUrl: data.humanitarian_learn_more_url || 'https://allohalal.fr/humanitarian',
-        enableStripe: data.enable_stripe !== false,
-        stripeMode: (data.stripe_mode === 'live' ? 'live' : 'test'),
-        stripePublishableKey: data.stripe_publishable_key || '',
-        stripeSecretKey: data.stripe_secret_key || '',
-        stripeWebhookSecret: data.stripe_webhook_secret || '',
-        stripeCurrency: data.stripe_currency || 'eur',
+        enablePaddle: data.enable_paddle !== undefined ? data.enable_paddle !== false : (data.enable_stripe !== false),
+        paddleMode: (data.paddle_mode === 'live' ? 'live' : 'sandbox'),
+        paddleApiKey: apiKey,
+        paddleClientToken: clientToken,
+        paddleWebhookSecret: webhookSecret,
+        paddleCurrency: data.paddle_currency || data.stripe_currency || 'eur',
         updatedAt: data.updated_at || new Date().toISOString(),
         updatedBy: data.updated_by || 'Admin',
       };
@@ -889,6 +1038,12 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
+        if (parsed.paddleClientToken && parsed.paddleClientToken.startsWith('pk_')) {
+          delete parsed.paddleClientToken;
+        }
+        if (!parsed.paddleApiKey || parsed.paddleApiKey.startsWith('sk_')) {
+          delete parsed.paddleApiKey;
+        }
         return {
           ...DEFAULT_AUTH_SETTINGS,
           ...parsed,
@@ -941,39 +1096,22 @@ export const saveAuthSettings = async (
     humanitarian_text: settings.humanitarianText || '',
     humanitarian_organization_name: settings.humanitarianOrganizationName || 'Global Halal Emergency Food Relief',
     humanitarian_learn_more_url: settings.humanitarianLearnMoreUrl || 'https://allohalal.fr/humanitarian',
-    enable_stripe: settings.enableStripe !== false,
-    stripe_mode: settings.stripeMode === 'live' ? 'live' : 'test',
-    stripe_publishable_key: (settings.stripePublishableKey || '').trim(),
-    stripe_secret_key: (settings.stripeSecretKey || '').trim(),
-    stripe_webhook_secret: (settings.stripeWebhookSecret || '').trim(),
-    stripe_currency: (settings.stripeCurrency || 'eur').trim().toLowerCase(),
+    // Live Supabase table columns for credentials
+    enable_stripe: settings.enablePaddle !== false,
+    stripe_mode: settings.paddleMode === 'live' ? 'live' : 'test',
+    stripe_publishable_key: (settings.paddleClientToken || '').trim(),
+    stripe_secret_key: (settings.paddleApiKey || '').trim(),
+    stripe_webhook_secret: (settings.paddleWebhookSecret || '').trim(),
+    stripe_currency: (settings.paddleCurrency || 'eur').trim().toLowerCase(),
     updated_at: new Date().toISOString(),
     updated_by: updatedBy,
   };
 
   try {
+    // 1. Primary upsert with all standard columns verified to exist in live Supabase
     const { error } = await supabase.from('auth_settings').upsert(payload);
     if (error) {
-      console.warn('Initial Supabase upsert error, attempting fallback without template columns:', error.message);
-      // Fallback in case table does not have new template columns yet
-      const fallbackPayload = {
-        id: 'global',
-        force_user_auth: settings.forceUserAuth,
-        allow_guest_scan: !settings.forceUserAuth,
-        enable_contributions: settings.enableContributions !== false,
-        require_email_verification: Boolean(settings.requireEmailVerification),
-        send_welcome_email: settings.sendWelcomeEmail !== false,
-        email_provider: settings.emailProvider || 'BOTH',
-        smtp_host: (settings.smtpHost || '').trim(),
-        smtp_port: Number(settings.smtpPort || 587),
-        smtp_user: (settings.smtpUser || '').trim(),
-        smtp_pass: settings.smtpPass || '',
-        smtp_from_email: (settings.smtpFromEmail || '').trim(),
-        smtp_from_name: (settings.smtpFromName || 'Allo Halal').trim(),
-        updated_at: payload.updated_at,
-        updated_by: updatedBy,
-      };
-      await supabase.from('auth_settings').upsert(fallbackPayload);
+      console.warn('Supabase save Auth settings note:', error.message);
     }
   } catch (err) {
     console.warn('Supabase save Auth settings warning:', err);
@@ -1328,8 +1466,8 @@ export const fetchContributions = async (): Promise<Contribution[]> => {
           amount: Number(item.amount || 0),
           currency: (item.currency || 'EUR').toUpperCase(),
           tier,
-          paymentMethod: (item.payment_method || 'STRIPE').toUpperCase(),
-          transactionId: item.transaction_id || item.stripe_session_id || item.id,
+          paymentMethod: (item.payment_method || 'PADDLE').toUpperCase(),
+          transactionId: item.transaction_id || item.paddle_transaction_id || item.stripe_session_id || item.id,
           message: item.message || item.moderator_note || '',
           status,
           isAnonymous: item.is_anonymous === true,
@@ -1367,8 +1505,8 @@ export const fetchContributions = async (): Promise<Contribution[]> => {
               amount: Number(item.amount || 0),
               currency: item.currency || 'EUR',
               tier: item.tier || 'SERVER',
-              paymentMethod: item.paymentMethod || item.payment_method || 'STRIPE',
-              transactionId: item.transactionId || item.transaction_id,
+              paymentMethod: item.paymentMethod || item.payment_method || 'PADDLE',
+              transactionId: item.transactionId || item.transaction_id || item.paddle_transaction_id,
               message: item.message || item.moderatorNote || item.moderator_note || '',
               status: item.status === 'PENDING' ? 'PENDING' : item.status === 'REFUNDED' ? 'REFUNDED' : 'COMPLETED',
               isAnonymous: Boolean(item.isAnonymous ?? item.is_anonymous),

@@ -53,45 +53,47 @@ export async function GET(req: NextRequest) {
       test_ios_rewarded_id: 'ca-app-pub-3940256099942544/1712485313',
     };
 
-    // Resolve direct Android unit IDs (Test or Production ID configured by admin)
+    // Resolve unit IDs based on requesting platform (iOS or Android)
+    const isIos = platform === 'ios';
+
     const appId = (
-      s.android_app_id ||
-      s.test_android_app_id ||
-      'ca-app-pub-3940256099942544~3347511713'
+      isIos
+        ? (s.ios_app_id || s.test_ios_app_id || 'ca-app-pub-3940256099942544~1458002511')
+        : (s.android_app_id || s.test_android_app_id || 'ca-app-pub-3940256099942544~3347511713')
     ).trim();
 
     const bannerId = (
-      s.android_banner_id ||
-      s.test_android_banner_id ||
-      'ca-app-pub-3940256099942544/6300978111'
+      isIos
+        ? (s.ios_banner_id || s.banner_id_ios || s.test_ios_banner_id || 'ca-app-pub-3940256099942544/2934735716')
+        : (s.android_banner_id || s.banner_id_android || s.test_android_banner_id || 'ca-app-pub-3940256099942544/6300978111')
     ).trim();
 
     const interstitialId = (
-      s.android_interstitial_id ||
-      s.test_android_interstitial_id ||
-      'ca-app-pub-3940256099942544/1033173712'
+      isIos
+        ? (s.ios_interstitial_id || s.interstitial_id_ios || s.test_ios_interstitial_id || 'ca-app-pub-3940256099942544/4411468910')
+        : (s.android_interstitial_id || s.interstitial_id_android || s.test_android_interstitial_id || 'ca-app-pub-3940256099942544/1033173712')
     ).trim();
 
     const appOpenId = (
-      s.android_app_open_id ||
-      s.test_android_app_open_id ||
-      'ca-app-pub-3940256099942544/9257395921'
+      isIos
+        ? (s.ios_app_open_id || s.test_ios_app_open_id || 'ca-app-pub-3940256099942544/5575463023')
+        : (s.android_app_open_id || s.test_android_app_open_id || 'ca-app-pub-3940256099942544/9257395921')
     ).trim();
 
     const nativeId = (
-      s.android_native_id ||
-      s.test_android_native_id ||
-      'ca-app-pub-3940256099942544/2247696110'
+      isIos
+        ? (s.ios_native_id || s.test_ios_native_id || 'ca-app-pub-3940256099942544/3986624511')
+        : (s.android_native_id || s.test_android_native_id || 'ca-app-pub-3940256099942544/2247696110')
     ).trim();
 
     const rewardedId = (
-      s.android_rewarded_id ||
-      s.test_android_rewarded_id ||
-      'ca-app-pub-3940256099942544/5224354917'
+      isIos
+        ? (s.ios_rewarded_id || s.rewarded_id_ios || s.test_ios_rewarded_id || 'ca-app-pub-3940256099942544/1712485313')
+        : (s.android_rewarded_id || s.rewarded_id_android || s.test_android_rewarded_id || 'ca-app-pub-3940256099942544/5224354917')
     ).trim();
 
     const activeIds = {
-      platform: 'android',
+      platform: isIos ? 'ios' : 'android',
       appId,
       bannerId,
       interstitialId,

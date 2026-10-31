@@ -67,8 +67,9 @@ export interface Contribution {
   amount: number;
   currency: string; // 'EUR' | 'USD' | 'GBP'
   tier: DonationTier;
-  paymentMethod: 'STRIPE' | 'PAYPAL' | 'APPLE_PAY' | 'GOOGLE_PAY' | 'MANUAL';
+  paymentMethod: 'PADDLE' | 'STRIPE' | 'PAYPAL' | 'APPLE_PAY' | 'GOOGLE_PAY' | 'MANUAL';
   transactionId?: string;
+  paddleTransactionId?: string;
   message?: string;
   status: DonationStatus;
   isAnonymous?: boolean;
@@ -80,6 +81,7 @@ export interface GeoAd {
   id: string;
   title: string;
   sponsorName: string;
+  category?: string; // 'butcher' | 'restaurant' | 'grocery' | 'bakery' | 'other'
   bannerImageUrl: string;
   targetUrl: string;
   latitude: number;
@@ -91,6 +93,14 @@ export interface GeoAd {
   clickCount: number;
   startDate: string;
   endDate?: string;
+}
+
+export interface PartnerCategory {
+  id: string;
+  name: string;
+  displayOrder?: number;
+  isActive?: boolean;
+  createdAt?: string;
 }
 
 export interface GroqApiLog {
@@ -228,13 +238,13 @@ export interface AuthSettings {
   humanitarianOrganizationName?: string;
   humanitarianLearnMoreUrl?: string;
 
-  // Payment Gateway Configuration (Stripe)
-  enableStripe?: boolean;
-  stripeMode?: 'test' | 'live';
-  stripePublishableKey?: string;
-  stripeSecretKey?: string;
-  stripeWebhookSecret?: string;
-  stripeCurrency?: string;
+  // Payment Gateway Configuration (Paddle Billing)
+  enablePaddle?: boolean;
+  paddleMode?: 'sandbox' | 'live';
+  paddleApiKey?: string;
+  paddleClientToken?: string;
+  paddleWebhookSecret?: string;
+  paddleCurrency?: string;
 
   updatedAt: string;
   updatedBy: string;

@@ -1,10 +1,17 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { GeoAd } from '@/lib/types';
+import { GeoAd, PartnerCategory } from '@/lib/types';
 import { APP_COLORS } from '@/lib/colors';
 import { toast } from '@/lib/toast';
-import { fetchCmsSettings, saveCmsSettings } from '@/lib/storage';
+import {
+  fetchCmsSettings,
+  saveCmsSettings,
+  fetchPartnerCategories,
+  savePartnerCategory,
+  deletePartnerCategory,
+  renamePartnerCategory,
+} from '@/lib/storage';
 import {
   MapPin,
   Plus,
@@ -28,6 +35,7 @@ import {
   Save,
   Sparkles,
   CheckCircle2,
+  Tag,
 } from 'lucide-react';
 
 interface GeoAdsProps {
@@ -58,14 +66,89 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
   searchQuery,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAd, setEditingAd] = useState<GeoAd | null>(null);
   const [deleteConfirmAd, setDeleteConfirmAd] = useState<GeoAd | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
+  // Category CRUD State
+  const [categories, setCategories] = useState<PartnerCategory[]>([]);
+  const [isCatModalOpen, setIsCatModalOpen] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [editingCatId, setEditingCatId] = useState<string | null>(null);
+  const [editCatName, setEditCatName] = useState('');
+  const [catDeleteConfirmId, setCatDeleteConfirmId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchPartnerCategories().then((cats) => {
+      setCategories(cats);
+    });
+  }, []);
+
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newCatName.trim();
+    if (!name) return;
+
+    if (categories.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+      toast.error(`Category "${name}" already exists!`);
+      return;
+    }
+
+    const slug = name.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+    const newCat: PartnerCategory = {
+      id: slug || `cat_${Date.now()}`,
+      name,
+      displayOrder: (categories.length + 1) * 10,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updated = await savePartnerCategory(newCat);
+    setCategories(updated);
+    setCategory(name);
+    setNewCatName('');
+    toast.success(`Category "${name}" added successfully.`);
+  };
+
+  const handleStartEditCategory = (cat: PartnerCategory) => {
+    setEditingCatId(cat.id);
+    setEditCatName(cat.name);
+  };
+
+  const handleSaveEditCategory = async (cat: PartnerCategory) => {
+    const cleanNew = editCatName.trim();
+    if (!cleanNew) return;
+    if (cleanNew.toLowerCase() === cat.name.toLowerCase()) {
+      setEditingCatId(null);
+      return;
+    }
+
+    const updated = await renamePartnerCategory(cat.id, cat.name, cleanNew);
+    setCategories(updated);
+    if (category.toLowerCase() === cat.name.toLowerCase()) {
+      setCategory(cleanNew);
+    }
+    setEditingCatId(null);
+    toast.success(`Category renamed to "${cleanNew}".`);
+  };
+
+  const handleConfirmDeleteCategory = async (id: string) => {
+    const target = categories.find((c) => c.id === id);
+    const updated = await deletePartnerCategory(id);
+    setCategories(updated);
+    if (category.toLowerCase() === target?.name.toLowerCase()) {
+      setCategory(updated[0]?.name || 'Restaurant');
+    }
+    setCatDeleteConfirmId(null);
+    toast.success(`Category "${target?.name || id}" deleted.`);
+  };
+
   // Form State
   const [title, setTitle] = useState('');
   const [sponsorName, setSponsorName] = useState('');
+  const [category, setCategory] = useState('Restaurant');
   const [bannerImageUrl, setBannerImageUrl] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
   const [latitude, setLatitude] = useState(23.8103);
@@ -118,6 +201,7 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
     setEditingAd(null);
     setTitle('');
     setSponsorName('');
+    setCategory('Restaurant');
     setBannerImageUrl('');
     setTargetUrl('');
     setLatitude(23.8103);
@@ -131,6 +215,7 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
     setEditingAd(ad);
     setTitle(ad.title);
     setSponsorName(ad.sponsorName);
+    setCategory(ad.category || 'Restaurant');
     setBannerImageUrl(ad.bannerImageUrl);
     setTargetUrl(ad.targetUrl);
     setLatitude(ad.latitude);
@@ -173,6 +258,7 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
       id: editingAd ? editingAd.id : `ad-${Date.now()}`,
       title: title.trim(),
       sponsorName: sponsorName.trim(),
+      category: category || 'restaurant',
       bannerImageUrl: bannerImageUrl.trim(),
       targetUrl: targetUrl.trim(),
       latitude: Number(latitude),
@@ -228,14 +314,16 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
     return ads.filter((a) => {
       if (statusFilter === 'ACTIVE' && !a.isActive) return false;
       if (statusFilter === 'PAUSED' && a.isActive) return false;
+      if (categoryFilter !== 'ALL' && (a.category || 'restaurant') !== categoryFilter) return false;
       if (!q) return true;
       return (
         a.title.toLowerCase().includes(q) ||
         a.sponsorName.toLowerCase().includes(q) ||
-        a.locationName.toLowerCase().includes(q)
+        a.locationName.toLowerCase().includes(q) ||
+        (a.category && a.category.toLowerCase().includes(q))
       );
     });
-  }, [ads, statusFilter, searchQuery]);
+  }, [ads, statusFilter, categoryFilter, searchQuery]);
 
   return (
     <div className="space-y-6 pb-16">
@@ -268,14 +356,25 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={openNewModal}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-2 transition-all cursor-pointer active:scale-98 ${c.primaryBg} ${c.primaryBgHover}`}
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Campaign</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setIsCatModalOpen(true)}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center gap-2 transition-all cursor-pointer active:scale-98"
+          >
+            <Tag className="w-4 h-4 text-slate-500" />
+            <span>Manage Categories ({categories.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={openNewModal}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-2 transition-all cursor-pointer active:scale-98 ${c.primaryBg} ${c.primaryBgHover}`}
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Campaign</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. KPI Summary Cards */}
@@ -425,31 +524,66 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
       </div>
 
       {/* 3. Filter Pills */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="inline-flex items-center gap-1.5 bg-white border border-slate-200 p-1 rounded-xl shadow-2xs">
-          {(
-            [
-              { id: 'ALL', label: `All (${ads.length})` },
-              { id: 'ACTIVE', label: `Active (${stats.active})` },
-              { id: 'PAUSED', label: `Paused (${ads.length - stats.active})` },
-            ] as const
-          ).map((tab) => {
-            const active = statusFilter === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setStatusFilter(tab.id)}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  active
-                    ? `${c.primaryBg} text-white shadow-2xs`
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                }`}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Status Filter */}
+          <div className="inline-flex items-center gap-1.5 bg-white border border-slate-200 p-1 rounded-xl shadow-2xs">
+            {(
+              [
+                { id: 'ALL', label: `All (${ads.length})` },
+                { id: 'ACTIVE', label: `Active (${stats.active})` },
+                { id: 'PAUSED', label: `Paused (${ads.length - stats.active})` },
+              ] as const
+            ).map((tab) => {
+              const active = statusFilter === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    active
+                      ? `${c.primaryBg} text-white shadow-2xs`
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Category Filter */}
+          <div className="inline-flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-xl shadow-2xs overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('ALL')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                categoryFilter === 'ALL'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+            >
+              All Categories
+            </button>
+            {categories.map((cat) => {
+              const active = categoryFilter.toLowerCase() === cat.name.toLowerCase();
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setCategoryFilter(cat.name)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  }`}
+                >
+                  {cat.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -503,22 +637,31 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                     {/* Multi-stop gradient scrim matching Flutter GeoAdBannerWidget */}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/25" />
 
-                    {/* Top Bar: Featured Partner & Radius Pill */}
+                    {/* Top Bar: Featured Partner, Category & Radius Pill */}
                     <div className="absolute top-3.5 inset-x-3.5 flex items-center justify-between gap-2">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md">
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            ad.isActive
-                              ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)]'
-                              : 'bg-slate-400'
-                          }`}
-                        />
-                        <span className="text-[10px] font-extrabold text-white tracking-wider uppercase">
-                          Featured Partner
-                        </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md">
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              ad.isActive
+                                ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)]'
+                                : 'bg-slate-400'
+                            }`}
+                          />
+                          <span className="text-[10px] font-extrabold text-white tracking-wider uppercase">
+                            Featured Partner
+                          </span>
+                        </div>
+
+                        {/* Category Badge (Text Only, No Icon) */}
+                        {ad.category?.trim() && (
+                          <div className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-900/70 border border-emerald-400/40 backdrop-blur-md text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
+                            <span>{ad.category.trim()}</span>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md text-[11px] font-bold text-white">
+                      <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md text-[11px] font-bold text-white shrink-0">
                         <MapPin className="w-3 h-3 text-blue-400" />
                         <span>{ad.radiusKm} km radius</span>
                       </div>
@@ -772,6 +915,39 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                 </div>
 
                 <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Category</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCatModalOpen(true)}
+                      className="text-[11px] text-[#088839] hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Manage Categories</span>
+                    </button>
+                  </div>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className={`${inputCls} font-medium`}
+                    required
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name}
+                      </option>
+                    ))}
+                    {category &&
+                      !categories.some(
+                        (c) => c.name.toLowerCase() === category.toLowerCase()
+                      ) && <option value={category}>{category}</option>}
+                  </select>
+                </div>
+
+                <div>
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
                     <ImageIcon className="w-3.5 h-3.5 text-slate-400" />
                     <span>Banner Image URL</span>
@@ -786,7 +962,7 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                   />
                 </div>
 
-                <div>
+                <div className="md:col-span-2">
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
                     <Link2 className="w-3.5 h-3.5 text-slate-400" />
                     <span>Target Redirect URL</span>
@@ -983,6 +1159,178 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                 className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 cursor-pointer"
               >
                 Delete Campaign
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Category Management Modal (Add, Edit, Delete) */}
+      {isCatModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/45 backdrop-blur-xs">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#e6f4eb] border border-[#b5e0c5] flex items-center justify-center text-[#088839]">
+                  <Tag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Partner Categories</h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Add, edit, or delete categories displayed across the app directory
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCatModalOpen(false);
+                  setEditingCatId(null);
+                  setCatDeleteConfirmId(null);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Add Category Form */}
+            <form onSubmit={handleAddCategory} className="flex gap-2">
+              <input
+                type="text"
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="New category name (e.g. Traiteur, Pharmacie...)"
+                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#088839] focus:bg-white placeholder:text-slate-400 font-medium"
+                required
+              />
+              <button
+                type="submit"
+                disabled={!newCatName.trim()}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 ${c.primaryBg} ${c.primaryBgHover}`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add</span>
+              </button>
+            </form>
+
+            {/* Category List */}
+            <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+              {categories.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400 font-medium">
+                  No categories found. Add your first category above.
+                </div>
+              ) : (
+                categories.map((cat) => {
+                  const partnerCount = ads.filter(
+                    (a) => (a.category || '').toLowerCase().trim() === cat.name.toLowerCase().trim()
+                  ).length;
+                  const isEditing = editingCatId === cat.id;
+
+                  return (
+                    <div
+                      key={cat.id}
+                      className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 flex items-center justify-between gap-3 transition-colors"
+                    >
+                      {isEditing ? (
+                        <div className="flex-1 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editCatName}
+                            onChange={(e) => setEditCatName(e.target.value)}
+                            className="flex-1 bg-white border border-[#088839] rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none font-bold"
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEditCategory(cat)}
+                            className="p-1.5 rounded-lg bg-[#088839] text-white hover:bg-[#066d2e] transition-colors cursor-pointer"
+                            title="Save Rename"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingCatId(null)}
+                            className="p-1.5 rounded-lg bg-slate-200 text-slate-600 hover:bg-slate-300 transition-colors cursor-pointer"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="min-w-0 flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900 truncate">
+                              {cat.name}
+                            </span>
+                            <span className="text-[10.5px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium border border-slate-200">
+                              {partnerCount} {partnerCount === 1 ? 'partner' : 'partners'}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {catDeleteConfirmId === cat.id ? (
+                              <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg">
+                                <span className="text-[10.5px] font-bold text-rose-700">Delete?</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleConfirmDeleteCategory(cat.id)}
+                                  className="text-[10px] font-extrabold text-white bg-rose-600 px-2 py-0.5 rounded hover:bg-rose-700 cursor-pointer"
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCatDeleteConfirmId(null)}
+                                  className="text-[10px] font-bold text-slate-600 hover:text-slate-800 cursor-pointer"
+                                >
+                                  No
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditCategory(cat)}
+                                  className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                                  title="Edit / Rename Category"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setCatDeleteConfirmId(cat.id)}
+                                  className="p-1.5 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                  title="Delete Category"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer Close Button */}
+            <div className="flex items-center justify-end pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCatModalOpen(false);
+                  setEditingCatId(null);
+                  setCatDeleteConfirmId(null);
+                }}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                Done
               </button>
             </div>
           </div>

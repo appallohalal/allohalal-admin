@@ -203,7 +203,7 @@ export async function getActiveEmailConfig(): Promise<{
   confirmationBody: string;
 }> {
   let sendWelcomeEmail = true;
-  let smtpConfig: SmtpConfig = {
+  const smtpConfig: SmtpConfig = {
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
     port: Number(process.env.SMTP_PORT || 587),
     user: process.env.SMTP_USER || '',

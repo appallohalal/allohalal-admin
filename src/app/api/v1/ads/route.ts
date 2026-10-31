@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
         id: ad.id,
         title: ad.title,
         sponsorName: ad.sponsor_name,
+        category: ad.category || 'restaurant',
         bannerImageUrl: ad.banner_image_url,
         targetUrl: ad.target_url,
         latitude: ad.latitude,

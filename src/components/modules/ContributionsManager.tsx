@@ -37,6 +37,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { Contribution, DonationTier, AuthSettings } from '@/lib/types';
+import { DEFAULT_AUTH_SETTINGS } from '@/lib/storage';
 import { APP_COLORS } from '@/lib/colors';
 import { toast } from '@/lib/toast';
 
@@ -83,36 +84,57 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
 
   // Configuration Modal State
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [configTab, setConfigTab] = useState<'STRIPE' | 'TIERS' | 'HUMANITARIAN'>('STRIPE');
+  const [configTab, setConfigTab] = useState<'PADDLE' | 'TIERS' | 'HUMANITARIAN'>('PADDLE');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
-  // Form State for Payment Gateway (Stripe)
-  const [enableStripe, setEnableStripe] = useState<boolean>(
-    authSettings?.enableStripe !== false
+  // Form State for Payment Gateway (Paddle Billing)
+  const [enablePaddle, setEnablePaddle] = useState<boolean>(
+    authSettings?.enablePaddle !== false
   );
-  const [stripeMode, setStripeMode] = useState<'test' | 'live'>(
-    authSettings?.stripeMode || 'test'
+  const [paddleMode, setPaddleMode] = useState<'sandbox' | 'live'>(
+    authSettings?.paddleMode || 'sandbox'
   );
-  const [stripePublishableKey, setStripePublishableKey] = useState<string>(
-    authSettings?.stripePublishableKey ||
-      'pk_test_51P9nVoRrokKxR1k7GYpiCd7B9ZVwmR7MBuYx28GmKrRsaOPUHmSMSIESH62ZVDwx6IFlN8xSz7br9cg0LzfLVbrK00uFBuBNzr'
+  const [paddleClientToken, setPaddleClientToken] = useState<string>(
+    (authSettings?.paddleClientToken && !authSettings.paddleClientToken.startsWith('pk_'))
+      ? authSettings.paddleClientToken
+      : (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || DEFAULT_AUTH_SETTINGS.paddleClientToken || '')
   );
-  const [stripeSecretKey, setStripeSecretKey] = useState<string>(
-    authSettings?.stripeSecretKey || ''
+  const [paddleApiKey, setPaddleApiKey] = useState<string>(
+    (authSettings?.paddleApiKey && !authSettings.paddleApiKey.startsWith('sk_'))
+      ? authSettings.paddleApiKey
+      : (DEFAULT_AUTH_SETTINGS.paddleApiKey || '')
   );
-  const [stripeWebhookSecret, setStripeWebhookSecret] = useState<string>(
-    authSettings?.stripeWebhookSecret || ''
+  const [paddleCurrency, setPaddleCurrency] = useState<string>(
+    authSettings?.paddleCurrency || 'eur'
   );
-  const [stripeCurrency, setStripeCurrency] = useState<string>(
-    authSettings?.stripeCurrency || 'eur'
-  );
-  const [showSecretKey, setShowSecretKey] = useState<boolean>(false);
-  const [isTestingStripe, setIsTestingStripe] = useState<boolean>(false);
-  const [stripeTestResult, setStripeTestResult] = useState<{
+  const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [isTestingPaddle, setIsTestingPaddle] = useState<boolean>(false);
+  const [paddleTestResult, setPaddleTestResult] = useState<{
     success?: boolean;
     message?: string;
   } | null>(null);
   const [isRefreshingServer, setIsRefreshingServer] = useState<boolean>(false);
+  const [isSyncingPaddle, setIsSyncingPaddle] = useState<boolean>(false);
+
+  const handleSyncPaddle = async () => {
+    setIsSyncingPaddle(true);
+    try {
+      const res = await fetch('/api/paddle/sync-transactions', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(data.message || 'Transactions synchronized from Paddle!');
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } else {
+        toast.error(data.error || 'Failed to sync with Paddle');
+      }
+    } catch (err: any) {
+      toast.error('Network error syncing with Paddle: ' + err.message);
+    } finally {
+      setIsSyncingPaddle(false);
+    }
+  };
 
   // Form State for Presets & Tiers Configuration
   const [presets, setPresets] = useState<number[]>(
@@ -189,12 +211,22 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
       if (authSettings.humanitarianOrganizationName) setHumanitarianOrg(authSettings.humanitarianOrganizationName);
       if (authSettings.humanitarianLearnMoreUrl) setHumanitarianUrl(authSettings.humanitarianLearnMoreUrl);
 
-      setEnableStripe(authSettings.enableStripe !== false);
-      if (authSettings.stripeMode) setStripeMode(authSettings.stripeMode);
-      if (authSettings.stripePublishableKey) setStripePublishableKey(authSettings.stripePublishableKey);
-      if (authSettings.stripeSecretKey) setStripeSecretKey(authSettings.stripeSecretKey);
-      if (authSettings.stripeWebhookSecret) setStripeWebhookSecret(authSettings.stripeWebhookSecret);
-      if (authSettings.stripeCurrency) setStripeCurrency(authSettings.stripeCurrency);
+      setEnablePaddle(authSettings.enablePaddle !== false);
+      if (authSettings.paddleMode) setPaddleMode(authSettings.paddleMode);
+
+      const effectiveClientToken =
+        authSettings.paddleClientToken && !authSettings.paddleClientToken.startsWith('pk_')
+          ? authSettings.paddleClientToken
+          : (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || DEFAULT_AUTH_SETTINGS.paddleClientToken);
+      if (effectiveClientToken) setPaddleClientToken(effectiveClientToken);
+
+      const effectiveApiKey =
+        authSettings.paddleApiKey && !authSettings.paddleApiKey.startsWith('sk_')
+          ? authSettings.paddleApiKey
+          : DEFAULT_AUTH_SETTINGS.paddleApiKey;
+      if (effectiveApiKey) setPaddleApiKey(effectiveApiKey);
+
+      if (authSettings.paddleCurrency) setPaddleCurrency(authSettings.paddleCurrency);
     }
   }, [authSettings]);
 
@@ -354,7 +386,7 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
       (Number(d.amount) || 0).toFixed(2),
       d.currency || 'EUR',
       d.tier || 'SERVER',
-      d.paymentMethod || 'STRIPE',
+      d.paymentMethod || 'PADDLE',
       d.isAnonymous ? 'Yes' : 'No',
       `"${(d.message || '').replace(/"/g, '""')}"`,
       `"${new Date(d.createdAt).toISOString()}"`,
@@ -409,41 +441,41 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
     toast.success('Presets reset to standard €1, €3, €5, €10, €15.');
   };
 
-  const handleTestStripeConnection = async () => {
-    if (!stripeSecretKey.trim()) {
-      toast.error('Please enter your Stripe Secret API Key to test connection.');
+  const handleTestPaddleConnection = async () => {
+    if (!paddleApiKey.trim()) {
+      toast.error('Please enter your Paddle API Key to test connection.');
       return;
     }
-    setIsTestingStripe(true);
-    setStripeTestResult(null);
+    setIsTestingPaddle(true);
+    setPaddleTestResult(null);
     try {
-      const res = await fetch('/api/stripe/verify', {
+      const res = await fetch('/api/paddle/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ secretKey: stripeSecretKey }),
+        body: JSON.stringify({ apiKey: paddleApiKey, mode: paddleMode }),
       });
       const data = await res.json();
       if (data.success) {
-        setStripeTestResult({
+        setPaddleTestResult({
           success: true,
-          message: data.message || `Connected to Stripe in ${data.mode.toUpperCase()} mode!`,
+          message: data.message || `Connected to Paddle in ${data.mode.toUpperCase()} mode!`,
         });
-        toast.success(data.message || 'Stripe API key validated successfully.', 'Stripe Verified');
+        toast.success(data.message || 'Paddle API key validated successfully.', 'Paddle Verified');
       } else {
-        setStripeTestResult({
+        setPaddleTestResult({
           success: false,
-          message: data.error || 'Failed to authenticate with Stripe.',
+          message: data.error || 'Failed to authenticate with Paddle.',
         });
-        toast.error(data.error || 'Failed to authenticate with Stripe.', 'Stripe Auth Failed');
+        toast.error(data.error || 'Failed to authenticate with Paddle.', 'Paddle Auth Failed');
       }
     } catch (err: any) {
-      setStripeTestResult({
+      setPaddleTestResult({
         success: false,
         message: err.message || 'Network error while testing connection.',
       });
       toast.error(err.message || 'Network error while testing connection.', 'Connection Error');
     } finally {
-      setIsTestingStripe(false);
+      setIsTestingPaddle(false);
     }
   };
 
@@ -491,12 +523,11 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
         humanitarianText: humanitarianText.trim(),
         humanitarianOrganizationName: humanitarianOrg.trim(),
         humanitarianLearnMoreUrl: humanitarianUrl.trim(),
-        enableStripe: enableStripe,
-        stripeMode: stripeMode,
-        stripePublishableKey: stripePublishableKey.trim(),
-        stripeSecretKey: stripeSecretKey.trim(),
-        stripeWebhookSecret: stripeWebhookSecret.trim(),
-        stripeCurrency: stripeCurrency.trim().toLowerCase(),
+        enablePaddle: enablePaddle,
+        paddleMode: paddleMode,
+        paddleApiKey: paddleApiKey.trim(),
+        paddleClientToken: paddleClientToken.trim(),
+        paddleCurrency: paddleCurrency.trim().toLowerCase(),
         updatedAt: new Date().toISOString(),
         updatedBy: currentAdminName || 'Admin',
       };
@@ -555,6 +586,13 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
 
   const getPaymentMethodBadge = (method: string) => {
     switch (method) {
+      case 'PADDLE':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+            <CreditCard className="w-3 h-3 text-emerald-500" />
+            Paddle
+          </span>
+        );
       case 'STRIPE':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
@@ -654,13 +692,13 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
           </button>
         </div>
 
-        {/* Card B: Stripe Payment Gateway Configuration */}
+        {/* Card B: Paddle Payment Gateway Configuration */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">
             <div
               className={`w-11 h-11 rounded-2xl shrink-0 flex items-center justify-center border shadow-xs ${
-                enableStripe
-                  ? 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                enablePaddle
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
                   : 'bg-slate-100 text-slate-400 border border-slate-200'
               }`}
             >
@@ -669,27 +707,27 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                  Stripe Gateway
+                  Paddle Gateway
                 </h2>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    stripeMode === 'live'
+                    paddleMode === 'live'
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}
                 >
-                  {stripeMode === 'live' ? 'Live' : 'Test Mode'}
+                  {paddleMode === 'live' ? 'Live' : 'Sandbox'}
                 </span>
-                {enableStripe && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                {enablePaddle && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Online
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
-                {stripePublishableKey
-                  ? `API Key: ${stripePublishableKey.slice(0, 10)}...`
-                  : 'API keys not configured'}
+                {paddleApiKey
+                  ? `API Key: ${paddleApiKey.slice(0, 10)}...`
+                  : 'Paddle API key not configured'}
               </p>
             </div>
           </div>
@@ -697,13 +735,13 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
           <button
             type="button"
             onClick={() => {
-              setConfigTab('STRIPE');
+              setConfigTab('PADDLE');
               setIsConfigModalOpen(true);
             }}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-98 shrink-0"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-98 shrink-0"
           >
-            <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
-            <span>Stripe</span>
+            <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Paddle</span>
           </button>
         </div>
 
@@ -1022,7 +1060,8 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
               className="px-2.5 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 focus:ring-2 focus:ring-[#088839]/20 focus:border-[#088839]"
             >
               <option value="ALL">All Gateways</option>
-              <option value="STRIPE">Stripe</option>
+              <option value="PADDLE">Paddle</option>
+              <option value="STRIPE">Stripe (Legacy)</option>
               <option value="PAYPAL">PayPal</option>
               <option value="APPLE_PAY">Apple Pay</option>
               <option value="GOOGLE_PAY">Google Pay</option>
@@ -1053,6 +1092,18 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
               <option value="amount_desc">Highest Amount</option>
               <option value="amount_asc">Lowest Amount</option>
             </select>
+
+            {/* Sync Paddle Live Button */}
+            <button
+              type="button"
+              disabled={isSyncingPaddle}
+              onClick={handleSyncPaddle}
+              title="Synchronize live transactions directly from Paddle API"
+              className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncingPaddle ? 'animate-spin' : ''}`} />
+              <span>{isSyncingPaddle ? 'Syncing...' : 'Sync Paddle'}</span>
+            </button>
           </div>
         </div>
 
@@ -1271,7 +1322,7 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                     Contributions &amp; Payment Gateway Configuration
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    Configure Stripe API Keys, presets (€1, €3, €5, €10, €15) &amp; humanitarian commitment
+                    Configure Paddle API Credentials, presets (€1, €3, €5, €10, €15) &amp; humanitarian commitment
                   </p>
                 </div>
               </div>
@@ -1286,15 +1337,15 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
             {/* Modal Tabs */}
             <div className="px-6 border-b border-slate-200 bg-white flex items-center gap-2 pt-2 overflow-x-auto">
               <button
-                onClick={() => setConfigTab('STRIPE')}
+                onClick={() => setConfigTab('PADDLE')}
                 className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
-                  configTab === 'STRIPE'
-                    ? 'border-indigo-600 text-indigo-700'
+                  configTab === 'PADDLE'
+                    ? 'border-emerald-600 text-emerald-700'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <CreditCard className="w-4 h-4 text-indigo-600" />
-                Stripe Payment Gateway
+                <CreditCard className="w-4 h-4 text-emerald-600" />
+                Paddle Payment Gateway
               </button>
               <button
                 onClick={() => setConfigTab('TIERS')}
@@ -1322,26 +1373,26 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
 
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto space-y-5 text-sm flex-1">
-              {/* TAB 0: STRIPE PAYMENT GATEWAY CONFIGURATION */}
-              {configTab === 'STRIPE' && (
+              {/* TAB 0: PADDLE PAYMENT GATEWAY CONFIGURATION */}
+              {configTab === 'PADDLE' && (
                 <div className="space-y-5">
-                  {/* Stripe Master Switch & Environment */}
+                  {/* Paddle Master Switch & Environment */}
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
                         <CreditCard className="w-5 h-5" />
                       </div>
                       <div>
                         <div className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
-                          Stripe Payment Processing
+                          Paddle Payment Processing
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                          Accept debit/credit cards, Apple Pay, and Google Pay for free-will contributions
+                          Accept debit/credit cards, Apple Pay, Google Pay, and localized payment methods via Paddle
                         </p>
                       </div>
                     </div>
 
-                    {/* Environment Selector: Test Mode vs Live Production */}
+                    {/* Environment Selector: Sandbox vs Live Production */}
                     <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <span className="text-xs font-bold text-slate-700 block font-mono">
@@ -1355,20 +1406,20 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                       <div className="inline-flex rounded-xl bg-white p-1 border border-slate-200 shadow-2xs">
                         <button
                           type="button"
-                          onClick={() => setStripeMode('test')}
+                          onClick={() => setPaddleMode('sandbox')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            stripeMode === 'test'
+                            paddleMode === 'sandbox'
                               ? 'bg-amber-100 text-amber-900 shadow-xs'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          Test Mode (Sandbox)
+                          Sandbox Mode
                         </button>
                         <button
                           type="button"
-                          onClick={() => setStripeMode('live')}
+                          onClick={() => setPaddleMode('live')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            stripeMode === 'live'
+                            paddleMode === 'live'
                               ? `${c.primaryBg} text-white shadow-xs`
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
@@ -1379,29 +1430,44 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                     </div>
                   </div>
 
-                  {/* API Keys Configuration */}
+                  {/* API Credentials Configuration */}
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                    <div className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-slate-600" />
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
-                        Stripe API Credentials ({stripeMode.toUpperCase()})
-                      </label>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-4 h-4 text-slate-600" />
+                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
+                          Paddle API Credentials ({paddleMode.toUpperCase()})
+                        </label>
+                      </div>
+                      {paddleMode === 'sandbox' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPaddleClientToken(DEFAULT_AUTH_SETTINGS.paddleClientToken || '');
+                            setPaddleApiKey(DEFAULT_AUTH_SETTINGS.paddleApiKey || '');
+                            toast.success('Loaded default sandbox keys. Click "Save Configuration" to persist.', 'Defaults Applied');
+                          }}
+                          className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Load Sandbox Defaults
+                        </button>
+                      )}
                     </div>
 
-                    {/* Publishable API Key */}
+                    {/* Client-side Token (Publishable Token) */}
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1 font-mono">
-                        Public API Key (Publishable Key)
+                        Client-side Token (Publishable Token)
                       </label>
                       <input
                         type="text"
-                        value={stripePublishableKey}
-                        onChange={(e) => setStripePublishableKey(e.target.value)}
-                        placeholder={stripeMode === 'live' ? 'pk_live_...' : 'pk_test_...'}
+                        value={paddleClientToken}
+                        onChange={(e) => setPaddleClientToken(e.target.value)}
+                        placeholder={paddleMode === 'live' ? 'live_...' : 'test_...'}
                         className={`${inputCls} font-mono`}
                       />
                       <p className="text-[11px] text-slate-500 mt-1 font-medium">
-                        Safe for client applications. Propagated dynamically to the mobile app for Stripe initialization.
+                        Safe for client applications and Paddle.js initialization in web/mobile checkouts.
                       </p>
                     </div>
 
@@ -1413,10 +1479,10 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                         </label>
                         <button
                           type="button"
-                          onClick={() => setShowSecretKey(!showSecretKey)}
+                          onClick={() => setShowApiKey(!showApiKey)}
                           className="text-xs font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
                         >
-                          {showSecretKey ? (
+                          {showApiKey ? (
                             <>
                               <EyeOff className="w-3.5 h-3.5" />
                               <span>Hide</span>
@@ -1432,47 +1498,47 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
 
                       <div className="flex gap-2">
                         <input
-                          type={showSecretKey ? 'text' : 'password'}
-                          value={stripeSecretKey}
-                          onChange={(e) => setStripeSecretKey(e.target.value)}
-                          placeholder={stripeMode === 'live' ? 'sk_live_...' : 'sk_test_...'}
+                          type={showApiKey ? 'text' : 'password'}
+                          value={paddleApiKey}
+                          onChange={(e) => setPaddleApiKey(e.target.value)}
+                          placeholder={paddleMode === 'live' ? 'pdl_live_...' : 'pdl_sdbx_...'}
                           className={`${inputCls} font-mono flex-1`}
                         />
                         <button
                           type="button"
-                          disabled={isTestingStripe || !stripeSecretKey.trim()}
-                          onClick={handleTestStripeConnection}
-                          className="px-4 py-2 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition-colors cursor-pointer shrink-0 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
+                          disabled={isTestingPaddle || !paddleApiKey.trim()}
+                          onClick={handleTestPaddleConnection}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer shrink-0 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
                         >
-                          {isTestingStripe ? (
+                          {isTestingPaddle ? (
                             <span>Verifying...</span>
                           ) : (
                             <>
-                              <Zap className="w-3.5 h-3.5 text-indigo-600" />
+                              <Zap className="w-3.5 h-3.5 text-emerald-600" />
                               <span>Test Connection</span>
                             </>
                           )}
                         </button>
                       </div>
                       <p className="text-[11px] text-slate-500 mt-1 font-medium">
-                        Kept encrypted on the server. Used by the backend to create hosted checkout sessions and verify payments.
+                        Kept secure on the server. Used to create Paddle transactions and verify incoming payments.
                       </p>
 
                       {/* Test Connection Result Feedback */}
-                      {stripeTestResult && (
+                      {paddleTestResult && (
                         <div
                           className={`mt-2.5 p-3 rounded-xl border flex items-center gap-2.5 text-xs font-medium ${
-                            stripeTestResult.success
+                            paddleTestResult.success
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                               : 'bg-rose-50 text-rose-800 border-rose-200'
                           }`}
                         >
-                          {stripeTestResult.success ? (
+                          {paddleTestResult.success ? (
                             <Check className="w-4 h-4 text-emerald-600 shrink-0" />
                           ) : (
                             <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
                           )}
-                          <span>{stripeTestResult.message}</span>
+                          <span>{paddleTestResult.message}</span>
                         </div>
                       )}
                     </div>

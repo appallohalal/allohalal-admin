@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS public.geo_ads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   title VARCHAR(255) NOT NULL,
   sponsor_name VARCHAR(255) NOT NULL,
+  category VARCHAR(64) DEFAULT 'restaurant',
   banner_image_url TEXT NOT NULL,
   target_url TEXT NOT NULL,
   latitude DOUBLE PRECISION NOT NULL,
@@ -110,6 +111,7 @@ CREATE TABLE IF NOT EXISTS public.geo_ads (
 
 CREATE INDEX IF NOT EXISTS idx_geo_ads_geom ON public.geo_ads USING GIST(geom);
 CREATE INDEX IF NOT EXISTS idx_geo_ads_active ON public.geo_ads(is_active);
+ALTER TABLE public.geo_ads ADD COLUMN IF NOT EXISTS category VARCHAR(64) DEFAULT 'restaurant';
 
 -- 7. Groq AI & Scan API Logs
 CREATE TABLE IF NOT EXISTS public.groq_api_logs (
@@ -488,12 +490,12 @@ ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_charity_s
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_text TEXT DEFAULT 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.';
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_organization_name TEXT DEFAULT 'Global Halal Emergency Food Relief';
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_learn_more_url TEXT DEFAULT 'https://allohalal.fr/humanitarian';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS enable_stripe BOOLEAN DEFAULT TRUE;
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_mode VARCHAR(16) DEFAULT 'test';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_publishable_key TEXT DEFAULT '';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_secret_key TEXT DEFAULT '';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_webhook_secret TEXT DEFAULT '';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_currency VARCHAR(8) DEFAULT 'eur';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS enable_paddle BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_mode VARCHAR(16) DEFAULT 'sandbox';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_api_key TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_client_token TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_webhook_secret TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_currency VARCHAR(8) DEFAULT 'eur';
 
 ALTER TABLE public.auth_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for auth_settings" ON public.auth_settings;
@@ -502,6 +504,13 @@ CREATE POLICY "Allow all for auth_settings" ON public.auth_settings FOR ALL USIN
 INSERT INTO public.auth_settings (id, force_user_auth, allow_guest_scan)
 VALUES ('global', false, true)
 ON CONFLICT (id) DO NOTHING;
+
+UPDATE public.auth_settings
+SET 
+  enable_paddle = TRUE,
+  paddle_mode = 'sandbox',
+  paddle_currency = 'eur'
+WHERE id = 'global';
 
 -- ==============================================================================
 -- 14. Dynamic Mobile App UI Text / CMS Configuration Table
@@ -533,7 +542,7 @@ CREATE TABLE IF NOT EXISTS public.contributions (
   amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
   currency VARCHAR(16) DEFAULT 'EUR',
   tier VARCHAR(32) DEFAULT 'SERVER', -- 'COFFEE', 'SERVER', 'GROWTH', 'PATRON'
-  payment_method VARCHAR(32) DEFAULT 'STRIPE', -- 'STRIPE', 'PAYPAL', 'APPLE_PAY', 'GOOGLE_PAY', 'MANUAL'
+  payment_method VARCHAR(32) DEFAULT 'PADDLE', -- 'PADDLE', 'PAYPAL', 'APPLE_PAY', 'GOOGLE_PAY', 'MANUAL'
   transaction_id VARCHAR(128),
   message TEXT,
   status VARCHAR(32) DEFAULT 'COMPLETED', -- 'COMPLETED', 'PENDING', 'REFUNDED'
@@ -549,8 +558,9 @@ ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS donor_location VARCHAR
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS amount NUMERIC(10, 2) DEFAULT 0.00;
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS currency VARCHAR(16) DEFAULT 'EUR';
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS tier VARCHAR(32) DEFAULT 'SERVER';
-ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS payment_method VARCHAR(32) DEFAULT 'STRIPE';
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS payment_method VARCHAR(32) DEFAULT 'PADDLE';
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(128);
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS paddle_transaction_id VARCHAR(128);
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(128);
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS message TEXT;
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'COMPLETED';
@@ -560,6 +570,87 @@ ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS reviewed_by VARCHAR(12
 ALTER TABLE public.contributions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for contributions" ON public.contributions;
 CREATE POLICY "Allow all for contributions" ON public.contributions FOR ALL USING (true) WITH CHECK (true);
+
+-- ==============================================================================
+-- 16. Partner Business Categories Table
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.partner_categories (
+  id VARCHAR(64) PRIMARY KEY,
+  name VARCHAR(128) NOT NULL,
+  display_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.partner_categories ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for partner_categories" ON public.partner_categories;
+CREATE POLICY "Allow all for partner_categories" ON public.partner_categories FOR ALL USING (true) WITH CHECK (true);
+
+INSERT INTO public.partner_categories (id, name, display_order)
+VALUES 
+  ('restaurant', 'Restaurant', 1),
+  ('butcher', 'Boucherie', 2),
+  ('grocery', 'Épicerie', 3),
+  ('bakery', 'Boulangerie', 4)
+ON CONFLICT (id) DO NOTHING;
+
+-- ==============================================================================
+-- 17. Push Notifications & Firebase Cloud Messaging (FCM) Settings
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.notification_settings (
+  id VARCHAR(64) PRIMARY KEY DEFAULT 'global',
+  firebase_project_id VARCHAR(255) DEFAULT 'allo-halal',
+  firebase_api_key TEXT DEFAULT '',
+  firebase_app_id VARCHAR(255) DEFAULT '',
+  firebase_messaging_sender_id VARCHAR(255) DEFAULT '',
+  firebase_service_account_json TEXT DEFAULT '',
+  firebase_server_key TEXT DEFAULT '',
+  is_enabled BOOLEAN DEFAULT TRUE,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by VARCHAR(128) DEFAULT 'Admin'
+);
+
+ALTER TABLE public.notification_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for notification_settings" ON public.notification_settings;
+CREATE POLICY "Allow all for notification_settings" ON public.notification_settings FOR ALL USING (true) WITH CHECK (true);
+
+INSERT INTO public.notification_settings (
+  id,
+  firebase_project_id,
+  firebase_api_key,
+  firebase_app_id,
+  firebase_messaging_sender_id,
+  is_enabled,
+  updated_by
+) VALUES (
+  'global',
+  'allo-halal',
+  'AIzaSyCPqOU5ymDEziX2CgcKUCU_p4cUyGQtKYw',
+  '1:142036889274:android:e5b3b41e042d7d99c9dc83',
+  '142036889274',
+  true,
+  'Admin'
+) ON CONFLICT (id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.push_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  target_audience VARCHAR(64) DEFAULT 'ALL',
+  delivery_status VARCHAR(32) DEFAULT 'SENT',
+  recipients_count INTEGER DEFAULT 0,
+  fcm_message_id VARCHAR(255),
+  sent_by VARCHAR(128) DEFAULT 'Admin',
+  sent_at TIMESTAMPTZ DEFAULT NOW(),
+  metadata JSONB DEFAULT '{}'::jsonb
+);
+
+ALTER TABLE public.push_notifications ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all for push_notifications" ON public.push_notifications;
+CREATE POLICY "Allow all for push_notifications" ON public.push_notifications FOR ALL USING (true) WITH CHECK (true);
+
+
 
 
 
