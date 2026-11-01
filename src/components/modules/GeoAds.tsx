@@ -36,6 +36,8 @@ import {
   Sparkles,
   CheckCircle2,
   Tag,
+  ShieldCheck,
+  Award,
 } from 'lucide-react';
 
 interface GeoAdsProps {
@@ -149,6 +151,8 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
   const [title, setTitle] = useState('');
   const [sponsorName, setSponsorName] = useState('');
   const [category, setCategory] = useState('Restaurant');
+  const [partnerBadge, setPartnerBadge] = useState('PARTENAIRE RECOMMANDÉ');
+  const [certifyingBody, setCertifyingBody] = useState('AVS');
   const [bannerImageUrl, setBannerImageUrl] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
   const [latitude, setLatitude] = useState(23.8103);
@@ -202,6 +206,8 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
     setTitle('');
     setSponsorName('');
     setCategory('Restaurant');
+    setPartnerBadge('PARTENAIRE RECOMMANDÉ');
+    setCertifyingBody('AVS');
     setBannerImageUrl('');
     setTargetUrl('');
     setLatitude(23.8103);
@@ -216,6 +222,8 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
     setTitle(ad.title);
     setSponsorName(ad.sponsorName);
     setCategory(ad.category || 'Restaurant');
+    setPartnerBadge(ad.partnerBadge || 'PARTENAIRE RECOMMANDÉ');
+    setCertifyingBody(ad.certifyingBody || '');
     setBannerImageUrl(ad.bannerImageUrl);
     setTargetUrl(ad.targetUrl);
     setLatitude(ad.latitude);
@@ -265,6 +273,8 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
       longitude: Number(longitude),
       radiusKm: Number(radiusKm),
       locationName: locationName.trim() || 'Local Area',
+      partnerBadge: partnerBadge.trim() || 'PARTENAIRE RECOMMANDÉ',
+      certifyingBody: certifyingBody.trim(),
       isActive: editingAd ? editingAd.isActive : true,
       impressionCount: editingAd ? editingAd.impressionCount : 0,
       clickCount: editingAd ? editingAd.clickCount : 0,
@@ -644,12 +654,12 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
                               ad.isActive
-                                ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.9)]'
+                                ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]'
                                 : 'bg-slate-400'
                             }`}
                           />
                           <span className="text-[10px] font-extrabold text-white tracking-wider uppercase">
-                            Featured Partner
+                            {ad.partnerBadge || 'PARTENAIRE RECOMMANDÉ'}
                           </span>
                         </div>
 
@@ -702,6 +712,13 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                           ({ad.latitude.toFixed(4)}, {ad.longitude.toFixed(4)})
                         </span>
                       </div>
+
+                      {ad.certifyingBody && (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200/90 text-emerald-800 font-bold text-xs">
+                          <ShieldCheck className="w-3.5 h-3.5 text-[#088839]" />
+                          <span>Certifié par : {ad.certifyingBody}</span>
+                        </div>
+                      )}
 
                       <a
                         href={ad.targetUrl}
@@ -960,6 +977,68 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                     className={inputCls}
                     required
                   />
+                </div>
+
+                {/* Partner Badge / Status */}
+                <div>
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                    <Award className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Partner Badge / Statut Partenaire</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={partnerBadge}
+                    onChange={(e) => setPartnerBadge(e.target.value)}
+                    placeholder="e.g. PARTENAIRE RECOMMANDÉ"
+                    className={inputCls}
+                  />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {['PARTENAIRE RECOMMANDÉ', 'PARTENAIRE VÉRIFIÉ', 'PARTENAIRE OFFICIEL'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setPartnerBadge(preset)}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                          partnerBadge === preset
+                            ? 'bg-amber-100 border-amber-300 text-amber-800'
+                            : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Certifying Body */}
+                <div>
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#088839]" />
+                    <span>Certifying Body / Organisme Certificateur</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={certifyingBody}
+                    onChange={(e) => setCertifyingBody(e.target.value)}
+                    placeholder="e.g. AVS, Achahada, Grande Mosquée de Paris"
+                    className={inputCls}
+                  />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {['AVS', 'Achahada', 'Grande Mosquée de Paris', 'SFCVH', 'Halal Correct'].map((org) => (
+                      <button
+                        key={org}
+                        type="button"
+                        onClick={() => setCertifyingBody(org)}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                          certifyingBody === org
+                            ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                            : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {org}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="md:col-span-2">

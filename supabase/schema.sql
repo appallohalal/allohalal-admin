@@ -99,6 +99,8 @@ CREATE TABLE IF NOT EXISTS public.geo_ads (
   longitude DOUBLE PRECISION NOT NULL,
   radius_km DOUBLE PRECISION DEFAULT 15.0,
   location_name VARCHAR(255),
+  partner_badge VARCHAR(128) DEFAULT 'PARTENAIRE RECOMMANDÉ',
+  certifying_body VARCHAR(128) DEFAULT 'AVS',
   is_active BOOLEAN DEFAULT TRUE,
   impression_count INTEGER DEFAULT 0,
   click_count INTEGER DEFAULT 0,
@@ -112,6 +114,8 @@ CREATE TABLE IF NOT EXISTS public.geo_ads (
 CREATE INDEX IF NOT EXISTS idx_geo_ads_geom ON public.geo_ads USING GIST(geom);
 CREATE INDEX IF NOT EXISTS idx_geo_ads_active ON public.geo_ads(is_active);
 ALTER TABLE public.geo_ads ADD COLUMN IF NOT EXISTS category VARCHAR(64) DEFAULT 'restaurant';
+ALTER TABLE public.geo_ads ADD COLUMN IF NOT EXISTS partner_badge VARCHAR(128) DEFAULT 'PARTENAIRE RECOMMANDÉ';
+ALTER TABLE public.geo_ads ADD COLUMN IF NOT EXISTS certifying_body VARCHAR(128) DEFAULT 'AVS';
 
 -- 7. Groq AI & Scan API Logs
 CREATE TABLE IF NOT EXISTS public.groq_api_logs (

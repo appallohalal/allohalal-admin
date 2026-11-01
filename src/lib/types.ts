@@ -88,6 +88,8 @@ export interface GeoAd {
   longitude: number;
   radiusKm: number;
   locationName: string;
+  partnerBadge?: string; // e.g. 'PARTENAIRE RECOMMANDÉ'
+  certifyingBody?: string; // e.g. 'AVS', 'Achahada', 'Grande Mosquée de Paris'
   isActive: boolean;
   impressionCount: number;
   clickCount: number;
