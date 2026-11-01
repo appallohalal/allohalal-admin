@@ -443,10 +443,10 @@ export const toggleAdActive = async (adId: string): Promise<GeoAd[]> => {
 // ==========================================
 
 export const DEFAULT_PARTNER_CATEGORIES: PartnerCategory[] = [
-  { id: 'restaurant', name: 'Restaurant', displayOrder: 1, isActive: true },
-  { id: 'butcher', name: 'Boucherie', displayOrder: 2, isActive: true },
-  { id: 'grocery', name: 'Épicerie', displayOrder: 3, isActive: true },
-  { id: 'bakery', name: 'Boulangerie', displayOrder: 4, isActive: true },
+  { id: 'restaurants', name: 'Restaurants', displayOrder: 1, isActive: true },
+  { id: 'boucheries', name: 'Boucheries', displayOrder: 2, isActive: true },
+  { id: 'epiceries', name: 'Épiceries', displayOrder: 3, isActive: true },
+  { id: 'boulangeries', name: 'Boulangeries', displayOrder: 4, isActive: true },
 ];
 
 export const fetchPartnerCategories = async (): Promise<PartnerCategory[]> => {
