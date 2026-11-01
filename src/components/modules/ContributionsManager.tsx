@@ -35,7 +35,6 @@ import {
   Lock,
   Zap,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react';
 import { Contribution, DonationTier, AuthSettings } from '@/lib/types';
 import { DEFAULT_AUTH_SETTINGS } from '@/lib/storage';
@@ -1406,41 +1405,7 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
             <div className="p-6 overflow-y-auto space-y-5 text-sm flex-1">
               {/* TAB 0: SCREEN COPY & TEXTS ("Modèle à Prix Libre") */}
               {configTab === 'TEXTS' && (
-                <div className="space-y-5">
-                  {/* Live Mobile Hero Card Preview */}
-                  <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-amber-800 mb-2 flex items-center gap-1.5 font-mono">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Mobile App Hero Card Live Preview</span>
-                    </div>
-
-                    <div className="bg-linear-to-br from-[#FFFBEB] to-[#F0FDF4] border border-[#F59E0B]/40 rounded-2xl p-4 shadow-xs">
-                      <div className="flex items-start gap-3">
-                        <div className="w-11 h-11 rounded-xl bg-linear-to-br from-[#F59E0B] to-[#D97706] flex items-center justify-center text-white shadow-md shadow-[#F59E0B]/30 shrink-0">
-                          <HeartHandshake className="w-5 h-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-extrabold text-slate-900 text-sm tracking-tight truncate">
-                              {contributionTitle || 'Modèle à Prix Libre'}
-                            </h4>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold text-[#D97706] bg-[#F59E0B]/20 border border-[#F59E0B]/40">
-                              ★ Prix libre
-                            </span>
-                          </div>
-                          <p className="text-xs text-[#088839] font-bold mt-0.5">
-                            {contributionSubtitle || 'Sans aucun abonnement • Libre • Sans engagement'}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                        {contributionDesc ||
-                          'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Form Inputs */}
+                <div className="space-y-4">
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
                     <div>
                       <label className="text-xs font-bold text-slate-800 block mb-1">
