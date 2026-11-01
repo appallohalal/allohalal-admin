@@ -1219,7 +1219,7 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                 <h3 className="text-sm font-bold text-slate-900">Delete Campaign?</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Are you sure you want to delete{' '}
-                  <span className="font-bold text-slate-700">"{deleteConfirmAd.title}"</span>?
+                  <span className="font-bold text-slate-700">&quot;{deleteConfirmAd.title}&quot;</span>?
                 </p>
               </div>
             </div>

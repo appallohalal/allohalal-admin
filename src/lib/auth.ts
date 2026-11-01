@@ -2,7 +2,6 @@
 
 import { supabase } from './supabase';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import QRCode from 'qrcode';
 
 export interface AdminUser {
   id: string;
