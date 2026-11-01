@@ -35,6 +35,7 @@ import {
   Lock,
   Zap,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { Contribution, DonationTier, AuthSettings } from '@/lib/types';
 import { DEFAULT_AUTH_SETTINGS } from '@/lib/storage';
@@ -84,8 +85,20 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
 
   // Configuration Modal State
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [configTab, setConfigTab] = useState<'PADDLE' | 'TIERS' | 'HUMANITARIAN'>('PADDLE');
+  const [configTab, setConfigTab] = useState<'TEXTS' | 'PADDLE' | 'TIERS' | 'HUMANITARIAN'>('TEXTS');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+  // Form State for Prix Libre Screen Texts ("Modèle à Prix Libre")
+  const [contributionTitle, setContributionTitle] = useState<string>(
+    authSettings?.contributionTitle || 'Modèle à Prix Libre'
+  );
+  const [contributionSubtitle, setContributionSubtitle] = useState<string>(
+    authSettings?.contributionSubtitle || 'Sans aucun abonnement • Libre • Sans engagement'
+  );
+  const [contributionDesc, setContributionDesc] = useState<string>(
+    authSettings?.contributionDesc ||
+      'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.'
+  );
 
   // Form State for Payment Gateway (Paddle Billing)
   const [enablePaddle, setEnablePaddle] = useState<boolean>(
@@ -190,6 +203,10 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
   // Sync state whenever authSettings prop changes
   useEffect(() => {
     if (authSettings) {
+      if (authSettings.contributionTitle) setContributionTitle(authSettings.contributionTitle);
+      if (authSettings.contributionSubtitle) setContributionSubtitle(authSettings.contributionSubtitle);
+      if (authSettings.contributionDesc) setContributionDesc(authSettings.contributionDesc);
+
       if (authSettings.contributionPresets && authSettings.contributionPresets.length > 0) {
         setPresets(authSettings.contributionPresets);
       }
@@ -508,6 +525,9 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
     try {
       const updatedPayload: AuthSettings = {
         ...authSettings,
+        contributionTitle: contributionTitle.trim(),
+        contributionSubtitle: contributionSubtitle.trim(),
+        contributionDesc: contributionDesc.trim(),
         contributionPresets: presets,
         defaultContributionAmount: defaultAmount,
         minContributionAmount: minAmount,
@@ -1337,6 +1357,17 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
             {/* Modal Tabs */}
             <div className="px-6 border-b border-slate-200 bg-white flex items-center gap-2 pt-2 overflow-x-auto">
               <button
+                onClick={() => setConfigTab('TEXTS')}
+                className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+                  configTab === 'TEXTS'
+                    ? `border-[#088839] ${c.primaryText}`
+                    : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FileText className="w-4 h-4 text-amber-600" />
+                Screen Copy &amp; Texts
+              </button>
+              <button
                 onClick={() => setConfigTab('PADDLE')}
                 className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
                   configTab === 'PADDLE'
@@ -1373,7 +1404,96 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
 
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto space-y-5 text-sm flex-1">
-              {/* TAB 0: PADDLE PAYMENT GATEWAY CONFIGURATION */}
+              {/* TAB 0: SCREEN COPY & TEXTS ("Modèle à Prix Libre") */}
+              {configTab === 'TEXTS' && (
+                <div className="space-y-5">
+                  {/* Live Mobile Hero Card Preview */}
+                  <div className="bg-amber-50/50 border border-amber-200/80 rounded-2xl p-4">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-amber-800 mb-2 flex items-center gap-1.5 font-mono">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Mobile App Hero Card Live Preview</span>
+                    </div>
+
+                    <div className="bg-linear-to-br from-[#FFFBEB] to-[#F0FDF4] border border-[#F59E0B]/40 rounded-2xl p-4 shadow-xs">
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-linear-to-br from-[#F59E0B] to-[#D97706] flex items-center justify-center text-white shadow-md shadow-[#F59E0B]/30 shrink-0">
+                          <HeartHandshake className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-extrabold text-slate-900 text-sm tracking-tight truncate">
+                              {contributionTitle || 'Modèle à Prix Libre'}
+                            </h4>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold text-[#D97706] bg-[#F59E0B]/20 border border-[#F59E0B]/40">
+                              ★ Prix libre
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#088839] font-bold mt-0.5">
+                            {contributionSubtitle || 'Sans aucun abonnement • Libre • Sans engagement'}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                        {contributionDesc ||
+                          'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Form Inputs */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block mb-1">
+                        Main Screen &amp; Card Title
+                      </label>
+                      <input
+                        type="text"
+                        value={contributionTitle}
+                        onChange={(e) => setContributionTitle(e.target.value)}
+                        placeholder="Modèle à Prix Libre"
+                        className={inputCls}
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                        Displayed in the mobile navigation bar and as the header of the top card.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block mb-1">
+                        Commitment Tagline / Subtitle
+                      </label>
+                      <input
+                        type="text"
+                        value={contributionSubtitle}
+                        onChange={(e) => setContributionSubtitle(e.target.value)}
+                        placeholder="Sans aucun abonnement • Libre • Sans engagement"
+                        className={inputCls}
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                        Green badge text directly under the main title emphasizing no mandatory subscription.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-800 block mb-1">
+                        Explanation &amp; Philosophy Paragraph
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={contributionDesc}
+                        onChange={(e) => setContributionDesc(e.target.value)}
+                        placeholder="Allo Halal refuse les abonnements payants obligatoires..."
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#088839] focus:ring-2 focus:ring-[#088839]/10 focus:bg-white transition-all font-medium leading-relaxed"
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                        Detailed explanation explaining why Allo Halal refuses paid subscriptions and invites free-will contributions.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 1: PADDLE PAYMENT GATEWAY CONFIGURATION */}
               {configTab === 'PADDLE' && (
                 <div className="space-y-5">
                   {/* Paddle Master Switch & Environment */}

@@ -925,6 +925,9 @@ export const DEFAULT_AUTH_SETTINGS: AuthSettings = {
   confirmationEmailTitle: DEFAULT_EMAIL_TEMPLATES.confirmationTitle,
   confirmationEmailSubtitle: DEFAULT_EMAIL_TEMPLATES.confirmationSubtitle,
   confirmationEmailBody: DEFAULT_EMAIL_TEMPLATES.confirmationBody,
+  contributionTitle: 'Modèle à Prix Libre',
+  contributionSubtitle: 'Sans aucun abonnement • Libre • Sans engagement',
+  contributionDesc: 'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.',
   contributionPresets: [1, 3, 5, 10, 15],
   defaultContributionAmount: 5,
   minContributionAmount: 1,
@@ -996,6 +999,9 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
         confirmationEmailTitle: data.confirmation_email_title || DEFAULT_EMAIL_TEMPLATES.confirmationTitle,
         confirmationEmailSubtitle: data.confirmation_email_subtitle || DEFAULT_EMAIL_TEMPLATES.confirmationSubtitle,
         confirmationEmailBody: data.confirmation_email_body || DEFAULT_EMAIL_TEMPLATES.confirmationBody,
+        contributionTitle: data.contribution_title || 'Modèle à Prix Libre',
+        contributionSubtitle: data.contribution_subtitle || 'Sans aucun abonnement • Libre • Sans engagement',
+        contributionDesc: data.contribution_desc || 'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.',
         contributionPresets: Array.isArray(data.contribution_presets)
           ? data.contribution_presets
           : (typeof data.contribution_presets === 'string'
@@ -1081,6 +1087,9 @@ export const saveAuthSettings = async (
     confirmation_email_title: settings.confirmationEmailTitle ?? DEFAULT_EMAIL_TEMPLATES.confirmationTitle,
     confirmation_email_subtitle: settings.confirmationEmailSubtitle ?? DEFAULT_EMAIL_TEMPLATES.confirmationSubtitle,
     confirmation_email_body: settings.confirmationEmailBody ?? DEFAULT_EMAIL_TEMPLATES.confirmationBody,
+    contribution_title: settings.contributionTitle || 'Modèle à Prix Libre',
+    contribution_subtitle: settings.contributionSubtitle || 'Sans aucun abonnement • Libre • Sans engagement',
+    contribution_desc: settings.contributionDesc || 'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.',
     contribution_presets: settings.contributionPresets || [1, 3, 5, 10, 15],
     default_contribution_amount: Number(settings.defaultContributionAmount || 5),
     min_contribution_amount: Number(settings.minContributionAmount || 1),

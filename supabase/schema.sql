@@ -476,6 +476,9 @@ ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS confirmation_email_tit
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS confirmation_email_subtitle TEXT DEFAULT 'Please verify your email address to secure and activate your account';
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS confirmation_email_body TEXT DEFAULT '';
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS contribution_presets JSONB DEFAULT '[1, 3, 5, 10, 15]'::jsonb;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS contribution_title TEXT DEFAULT 'Modèle à Prix Libre';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS contribution_subtitle TEXT DEFAULT 'Sans aucun abonnement • Libre • Sans engagement';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS contribution_desc TEXT DEFAULT 'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.';
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS default_contribution_amount NUMERIC(10, 2) DEFAULT 5.00;
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS min_contribution_amount NUMERIC(10, 2) DEFAULT 1.00;
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS max_contribution_amount NUMERIC(10, 2) DEFAULT 50.00;

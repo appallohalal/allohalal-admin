@@ -48,6 +48,9 @@ export async function GET() {
       confirmationEmailTitle: s.confirmation_email_title || 'Verify Your Email Address',
       confirmationEmailSubtitle: s.confirmation_email_subtitle || 'Please verify your email address to secure and activate your account',
       confirmationEmailBody: s.confirmation_email_body || '',
+      contributionTitle: s.contribution_title || 'Modèle à Prix Libre',
+      contributionSubtitle: s.contribution_subtitle || 'Sans aucun abonnement • Libre • Sans engagement',
+      contributionDesc: s.contribution_desc || 'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.',
       updatedAt: s.updated_at || new Date().toISOString(),
       updatedBy: s.updated_by || 'Admin',
     });
@@ -98,6 +101,9 @@ export async function POST(req: NextRequest) {
     if (body.confirmationEmailTitle !== undefined) payload.confirmation_email_title = String(body.confirmationEmailTitle).trim();
     if (body.confirmationEmailSubtitle !== undefined) payload.confirmation_email_subtitle = String(body.confirmationEmailSubtitle).trim();
     if (body.confirmationEmailBody !== undefined) payload.confirmation_email_body = String(body.confirmationEmailBody);
+    if (body.contributionTitle !== undefined) payload.contribution_title = String(body.contributionTitle).trim();
+    if (body.contributionSubtitle !== undefined) payload.contribution_subtitle = String(body.contributionSubtitle).trim();
+    if (body.contributionDesc !== undefined) payload.contribution_desc = String(body.contributionDesc).trim();
 
     let { data, error } = await supabase
       .from('auth_settings')

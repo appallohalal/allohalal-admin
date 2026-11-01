@@ -220,6 +220,9 @@ export interface AuthSettings {
   confirmationEmailBody?: string;
 
   // Contribution Presets & Tiers Configuration
+  contributionTitle?: string; // e.g. 'Modèle à Prix Libre'
+  contributionSubtitle?: string; // e.g. 'Sans aucun abonnement • Libre • Sans engagement'
+  contributionDesc?: string; // e.g. 'Allo Halal refuse les abonnements payants obligatoires...'
   contributionPresets?: number[]; // e.g. [1, 3, 5, 10, 15]
   defaultContributionAmount?: number; // e.g. 5
   minContributionAmount?: number; // e.g. 1
