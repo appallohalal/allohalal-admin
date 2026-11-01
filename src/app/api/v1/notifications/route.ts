@@ -318,11 +318,11 @@ export async function POST(req: NextRequest) {
       try {
         const { accessToken, projectId } = await getFirebaseAccessToken();
 
-        let targetTopic = 'global_alerts';
+        let targetTopic = 'all';
         if (country) {
           const sCountry = sanitizeTopic(country);
           const sCity = city ? sanitizeTopic(city) : '';
-          targetTopic = sCity ? `${sCountry}_${sCity}` : sCountry;
+          targetTopic = sCity ? `city_${sCity}` : `country_${sCountry}`;
         }
 
         const fcmMessage = {
@@ -341,10 +341,19 @@ export async function POST(req: NextRequest) {
             },
           },
           apns: {
+            headers: {
+              'apns-priority': '10',
+              'apns-push-type': 'alert',
+            },
             payload: {
               aps: {
+                alert: {
+                  title,
+                  body: message,
+                },
                 sound: 'default',
                 badge: 1,
+                'content-available': 1,
               },
             },
           },
