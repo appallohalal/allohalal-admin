@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { detectCertifierFromText } from '@/lib/certifiers';
 
 const LANGUAGE_NAME_TO_CODE: Record<string, string> = {
   english: 'en',
@@ -195,6 +196,8 @@ Output JSON Structure (MANDATORY):
 {
   "overall_status": "halal|haram|doubtful|not_food",
   "overall_reason": "Detailed summary of the entire product's status (IN ${language}).",
+  "certification_detected": true,
+  "certification_body": "Name of official Halal certifier if detected or mentioned on packaging/label (e.g. AVS, Achahada, Grande Mosquée de Paris, ARGML, Halal Services, etc.) or null",
   "ingredients": [
     {
       "name": "Original Name",
@@ -436,12 +439,40 @@ Output JSON Structure (MANDATORY):
       .filter((i) => i.status === 'halal')
       .map((i) => i.ingredient);
 
+    const textCert = detectCertifierFromText({
+      name: productName,
+      brand,
+      ingredients: ingredientsText,
+    });
+
+    const detectedCertifier =
+      existingDbProduct?.certifier ||
+      (rawParsed.certification_body && rawParsed.certification_body !== 'null'
+        ? String(rawParsed.certification_body).trim()
+        : null) ||
+      (textCert ? textCert.certifierName : null);
+
+    const isCertified =
+      existingDbProduct?.is_certified === true ||
+      Boolean(rawParsed.certification_detected) ||
+      Boolean(detectedCertifier);
+
+    const verifiedOfficial = existingDbProduct?.verified_official === true;
+
     const finalResult = {
       overallStatus: overallStatus === 'not_food' ? 'doubtful' : overallStatus,
       overall_status: overallStatus,
       overall_reason: rawParsed.overall_reason || rawParsed.reasoning || '',
       reasoning: rawParsed.overall_reason || rawParsed.reasoning || '',
       is_not_food: overallStatus === 'not_food',
+      certifier: detectedCertifier || '',
+      certification_body: detectedCertifier || '',
+      is_certified: isCertified,
+      isCertified,
+      verified_official: verifiedOfficial,
+      verifiedOfficial,
+      certification_details: existingDbProduct?.certification_details || '',
+      certificationDetails: existingDbProduct?.certification_details || '',
       ingredientResults,
       ingredients: ingredientResults,
       haramIngredients,
@@ -475,6 +506,9 @@ Output JSON Structure (MANDATORY):
             detected_additives: Array.from(detectedECodes),
             ai_status: dbAiStatus,
             is_overridden: false,
+            certifier: detectedCertifier || null,
+            is_certified: isCertified,
+            verified_official: false,
             scans_count: 1,
             updated_at: new Date().toISOString(),
           });

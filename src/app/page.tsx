@@ -209,9 +209,11 @@ export default function AdminDashboardPage() {
     productId: string,
     status: HalalStatus,
     note: string,
-    verifiedBy: string
+    verifiedBy: string,
+    certifier?: string,
+    verifiedOfficial?: boolean
   ) => {
-    const updated = await updateProductStatus(productId, status, note, verifiedBy);
+    const updated = await updateProductStatus(productId, status, note, verifiedBy, certifier, verifiedOfficial);
     setProducts(updated);
   };
 

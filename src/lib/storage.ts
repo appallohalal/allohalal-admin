@@ -44,6 +44,10 @@ export const fetchProducts = async (): Promise<Product[]> => {
         isOverridden: item.is_overridden || false,
         moderatorNote: item.moderator_note,
         verifiedBy: item.verified_by,
+        certifier: item.certifier || '',
+        isCertified: item.is_certified === true || Boolean(item.certifier),
+        verifiedOfficial: item.verified_official === true,
+        certificationDetails: item.certification_details || '',
         scansCount: item.scans_count || 0,
         lastScannedAt: item.updated_at || item.created_at,
         createdAt: item.created_at,
@@ -73,18 +77,29 @@ export const updateProductStatus = async (
   productId: string,
   newStatus: HalalStatus,
   moderatorNote: string,
-  verifiedBy: string = 'Admin'
+  verifiedBy: string = 'Admin',
+  certifier?: string,
+  verifiedOfficial?: boolean
 ): Promise<Product[]> => {
   try {
+    const updatePayload: Record<string, any> = {
+      manual_status: newStatus,
+      is_overridden: true,
+      moderator_note: moderatorNote,
+      verified_by: verifiedBy,
+      updated_at: new Date().toISOString(),
+    };
+    if (certifier !== undefined) {
+      updatePayload.certifier = certifier.trim();
+      updatePayload.is_certified = Boolean(certifier.trim());
+    }
+    if (verifiedOfficial !== undefined) {
+      updatePayload.verified_official = verifiedOfficial;
+    }
+
     await supabase
       .from('products')
-      .update({
-        manual_status: newStatus,
-        is_overridden: true,
-        moderator_note: moderatorNote,
-        verified_by: verifiedBy,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', productId);
   } catch (err) {
     console.warn('Supabase update note:', err);
@@ -107,6 +122,10 @@ export const saveProduct = async (product: Product): Promise<Product[]> => {
       is_overridden: product.isOverridden ?? true,
       moderator_note: product.moderatorNote || '',
       verified_by: product.verifiedBy || 'Admin',
+      certifier: product.certifier ? product.certifier.trim() : null,
+      is_certified: product.isCertified ?? Boolean(product.certifier?.trim()),
+      verified_official: product.verifiedOfficial ?? false,
+      certification_details: product.certificationDetails || '',
       scans_count: product.scansCount || 0,
       updated_at: new Date().toISOString(),
     };

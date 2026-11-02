@@ -13,6 +13,10 @@ export interface Product {
   isOverridden: boolean;
   moderatorNote?: string;
   verifiedBy?: string;
+  certifier?: string;
+  isCertified?: boolean;
+  verifiedOfficial?: boolean;
+  certificationDetails?: string;
   scansCount: number;
   lastScannedAt: string;
   createdAt: string;

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Product, HalalStatus } from '@/lib/types';
 import { APP_COLORS } from '@/lib/colors';
 import { toast } from '@/lib/toast';
+import { KNOWN_CERTIFIERS } from '@/lib/certifiers';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -25,6 +26,8 @@ import {
   FileText,
   FlaskConical,
   UserCheck,
+  ShieldCheck,
+  Award,
 } from 'lucide-react';
 
 interface ProductCatalogProps {
@@ -33,7 +36,9 @@ interface ProductCatalogProps {
     productId: string,
     status: HalalStatus,
     note: string,
-    verifiedBy: string
+    verifiedBy: string,
+    certifier?: string,
+    verifiedOfficial?: boolean
   ) => void;
   onSaveProduct?: (product: Product) => Promise<void> | void;
   onDeleteProduct?: (productId: string) => Promise<void> | void;
@@ -67,12 +72,17 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const [productStatus, setProductStatus] = useState<HalalStatus>('HALAL');
   const [productNote, setProductNote] = useState('');
   const [productVerifiedBy, setProductVerifiedBy] = useState(currentAdminName);
+  const [productCertifier, setProductCertifier] = useState('');
+  const [productVerifiedOfficial, setProductVerifiedOfficial] = useState(false);
+  const [productCertDetails, setProductCertDetails] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Quick Override Modal State
   const [selectedStatus, setSelectedStatus] = useState<HalalStatus>('HALAL');
   const [moderatorNote, setModeratorNote] = useState('');
   const [verifiedBy, setVerifiedBy] = useState(currentAdminName);
+  const [overrideCertifier, setOverrideCertifier] = useState('');
+  const [overrideVerifiedOfficial, setOverrideVerifiedOfficial] = useState(false);
 
   const c = APP_COLORS.classes;
   const inputCls = `w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`;
@@ -88,6 +98,9 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setProductStatus('HALAL');
     setProductNote('Manually verified and added by Halal Auditor');
     setProductVerifiedBy(currentAdminName);
+    setProductCertifier('');
+    setProductVerifiedOfficial(false);
+    setProductCertDetails('');
     setIsProductModalOpen(true);
   };
 
@@ -102,6 +115,9 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setProductStatus(p.manualStatus || p.aiStatus || 'HALAL');
     setProductNote(p.moderatorNote || '');
     setProductVerifiedBy(p.verifiedBy || currentAdminName);
+    setProductCertifier(p.certifier || '');
+    setProductVerifiedOfficial(p.verifiedOfficial || false);
+    setProductCertDetails(p.certificationDetails || '');
     setIsProductModalOpen(true);
   };
 
@@ -110,12 +126,21 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setSelectedStatus(p.manualStatus || p.aiStatus);
     setModeratorNote(p.moderatorNote || '');
     setVerifiedBy(p.verifiedBy || currentAdminName);
+    setOverrideCertifier(p.certifier || '');
+    setOverrideVerifiedOfficial(p.verifiedOfficial || false);
   };
 
   const handleSaveOverride = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
-    onUpdateStatus(editingProduct.id, selectedStatus, moderatorNote, verifiedBy);
+    onUpdateStatus(
+      editingProduct.id,
+      selectedStatus,
+      moderatorNote,
+      verifiedBy,
+      overrideCertifier,
+      overrideVerifiedOfficial
+    );
     toast.success(
       `Status for "${editingProduct.name}" updated to ${selectedStatus}.`,
       'Override Saved'
@@ -153,6 +178,10 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
       moderatorNote:
         productNote.trim() || `Verified as ${productStatus} by ${productVerifiedBy.trim()}`,
       verifiedBy: productVerifiedBy.trim() || currentAdminName,
+      certifier: productCertifier.trim() || undefined,
+      isCertified: Boolean(productCertifier.trim()),
+      verifiedOfficial: productVerifiedOfficial,
+      certificationDetails: productCertDetails.trim() || undefined,
       scansCount: fullEditProduct ? fullEditProduct.scansCount : 0,
       lastScannedAt: new Date().toISOString(),
       createdAt: fullEditProduct ? fullEditProduct.createdAt : new Date().toISOString(),
@@ -401,11 +430,23 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                             <div className="text-xs text-slate-500 truncate mt-0.5">
                               {product.brand}
                             </div>
-                            {product.isOverridden && (
-                              <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-[#066d2e] bg-[#e6f4eb] px-1.5 py-0.5 rounded-md border border-[#b5e0c5]">
-                                <Sparkles className="w-3 h-3" /> Verified by {product.verifiedBy}
-                              </span>
-                            )}
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {product.verifiedOfficial && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200">
+                                  <ShieldCheck className="w-3 h-3 text-blue-600" /> Vérification Officielle
+                                </span>
+                              )}
+                              {product.certifier && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200">
+                                  <Award className="w-3 h-3 text-emerald-600" /> {product.certifier}
+                                </span>
+                              )}
+                              {product.isOverridden && !product.verifiedOfficial && !product.certifier && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#066d2e] bg-[#e6f4eb] px-1.5 py-0.5 rounded-md border border-[#b5e0c5]">
+                                  <Sparkles className="w-3 h-3" /> Verified by {product.verifiedBy}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -716,6 +757,73 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 </div>
               </div>
 
+              {/* Halal Certification & Official Verification */}
+              <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-800">
+                      Organisme de Certification Halal
+                    </span>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={productVerifiedOfficial}
+                      onChange={(e) => setProductVerifiedOfficial(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                      Vérification Officielle Allo Halal
+                    </span>
+                  </label>
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    value={productCertifier}
+                    onChange={(e) => setProductCertifier(e.target.value)}
+                    placeholder="ex. AVS, Achahada, Grande Mosquée de Paris, ARGML..."
+                    className={inputCls}
+                  />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {KNOWN_CERTIFIERS.slice(0, 7).map((cert) => (
+                      <button
+                        key={cert.id}
+                        type="button"
+                        onClick={() => setProductCertifier(cert.shortName)}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
+                          productCertifier === cert.shortName
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                        }`}
+                      >
+                        {cert.shortName}
+                      </button>
+                    ))}
+                    {productCertifier && (
+                      <button
+                        type="button"
+                        onClick={() => setProductCertifier('')}
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 cursor-pointer"
+                      >
+                        ✕ Effacer
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {productVerifiedOfficial && (
+                  <p className="text-[11px] text-blue-600 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    Ce produit affichera le badge officiel "Vérification Officielle Allo Halal" dans l'application.
+                  </p>
+                )}
+              </div>
+
               {/* Action Buttons */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
@@ -874,6 +982,65 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                   className={inputCls}
                   required
                 />
+              </div>
+
+              {/* Halal Certification & Official Verification */}
+              <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Award className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-800">
+                      Organisme de Certification:
+                    </span>
+                  </div>
+
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={overrideVerifiedOfficial}
+                      onChange={(e) => setOverrideVerifiedOfficial(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-bold text-blue-700 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-blue-600" />
+                      Vérification Officielle Allo Halal
+                    </span>
+                  </label>
+                </div>
+
+                <input
+                  type="text"
+                  value={overrideCertifier}
+                  onChange={(e) => setOverrideCertifier(e.target.value)}
+                  placeholder="ex. AVS, Achahada, Grande Mosquée de Paris..."
+                  className={inputCls}
+                />
+
+                <div className="flex flex-wrap gap-1">
+                  {KNOWN_CERTIFIERS.slice(0, 6).map((cert) => (
+                    <button
+                      key={cert.id}
+                      type="button"
+                      onClick={() => setOverrideCertifier(cert.shortName)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                        overrideCertifier === cert.shortName
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      {cert.shortName}
+                    </button>
+                  ))}
+                  {overrideCertifier && (
+                    <button
+                      type="button"
+                      onClick={() => setOverrideCertifier('')}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">

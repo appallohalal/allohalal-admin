@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { detectCertifierFromText } from '@/lib/certifiers';
 
 const OFF_FIELDS =
   'code,product_name,product_name_fr,product_name_en,generic_name,generic_name_fr,' +
@@ -64,6 +65,10 @@ export async function POST(req: NextRequest) {
           verifiedBy: product.verified_by,
           detectedAdditives: product.detected_additives || [],
           ingredientsRaw: product.ingredients_raw,
+          certifier: product.certifier || '',
+          isCertified: product.is_certified === true || Boolean(product.certifier),
+          verifiedOfficial: product.verified_official === true,
+          certificationDetails: product.certification_details || '',
         },
       });
     }
@@ -115,6 +120,20 @@ export async function POST(req: NextRequest) {
 
               const imageUrl = p.image_front_url || p.image_url || null;
               const brand = p.brands || '';
+              const labels = [
+                ...(Array.isArray(p.labels_tags) ? p.labels_tags.map(String) : []),
+                ...(typeof p.labels === 'string' ? p.labels.split(',') : []),
+              ];
+
+              const detectedCert = detectCertifierFromText({
+                labels,
+                name,
+                brand,
+                ingredients: ingredientsRaw,
+              });
+
+              const certifier = detectedCert ? detectedCert.certifierName : null;
+              const isCertified = Boolean(detectedCert);
 
               // Asynchronously cache to Supabase so future requests are instantaneous
               supabase
@@ -129,6 +148,8 @@ export async function POST(req: NextRequest) {
                     detected_additives: additives,
                     ai_status: 'MUSHBOOH',
                     is_overridden: false,
+                    certifier,
+                    is_certified: isCertified,
                     scans_count: 1,
                     updated_at: new Date().toISOString(),
                   },
@@ -149,6 +170,10 @@ export async function POST(req: NextRequest) {
                   moderatorNote: null,
                   detectedAdditives: additives,
                   ingredientsRaw,
+                  certifier: certifier || '',
+                  isCertified,
+                  verifiedOfficial: false,
+                  certificationDetails: '',
                 },
               });
             }
