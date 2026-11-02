@@ -947,12 +947,18 @@ export const DEFAULT_AUTH_SETTINGS: AuthSettings = {
   humanitarianText: 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.',
   humanitarianOrganizationName: 'Global Halal Emergency Food Relief',
   humanitarianLearnMoreUrl: 'https://allohalal.fr/humanitarian',
-  enablePaddle: true,
-  paddleMode: 'sandbox',
-  paddleApiKey: process.env.PADDLE_API_KEY || '',
-  paddleClientToken: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || '',
-  paddleWebhookSecret: process.env.PADDLE_WEBHOOK_SECRET || '',
-  paddleCurrency: 'eur',
+  enableStripe: true,
+  stripeMode: 'test',
+  stripePublishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY || '',
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+  stripeCurrency: 'eur',
+  enablePaypal: true,
+  paypalMode: 'sandbox',
+  paypalClientId: process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '',
+  paypalSecretKey: process.env.PAYPAL_SECRET_KEY || '',
+  paypalMeUrl: process.env.NEXT_PUBLIC_PAYPAL_ME_URL || '',
+  paypalCurrency: 'eur',
   updatedAt: new Date().toISOString(),
   updatedBy: 'Admin',
 };
@@ -966,21 +972,6 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
       .maybeSingle();
 
     if (!error && data) {
-      const rawApiKey = (data.paddle_api_key || data.stripe_secret_key || '').trim();
-      const apiKey = (rawApiKey && rawApiKey.startsWith('pdl_'))
-        ? rawApiKey
-        : (DEFAULT_AUTH_SETTINGS.paddleApiKey || '');
-
-      const rawClientToken = (data.paddle_client_token || data.stripe_publishable_key || '').trim();
-      const clientToken = (rawClientToken && !rawClientToken.startsWith('pk_'))
-        ? rawClientToken
-        : (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || DEFAULT_AUTH_SETTINGS.paddleClientToken || '');
-
-      const rawWebhookSec = (data.paddle_webhook_secret || data.stripe_webhook_secret || '').trim();
-      const webhookSecret = (rawWebhookSec && !rawWebhookSec.startsWith('whsec_'))
-        ? rawWebhookSec
-        : (process.env.PADDLE_WEBHOOK_SECRET || DEFAULT_AUTH_SETTINGS.paddleWebhookSecret || '');
-
       const mapped: AuthSettings = {
         id: data.id,
         forceUserAuth: data.force_user_auth === true,
@@ -1025,12 +1016,18 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
         humanitarianText: data.humanitarian_text || 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.',
         humanitarianOrganizationName: data.humanitarian_organization_name || 'Global Halal Emergency Food Relief',
         humanitarianLearnMoreUrl: data.humanitarian_learn_more_url || 'https://allohalal.fr/humanitarian',
-        enablePaddle: data.enable_paddle !== undefined ? data.enable_paddle !== false : (data.enable_stripe !== false),
-        paddleMode: (data.paddle_mode === 'live' ? 'live' : 'sandbox'),
-        paddleApiKey: apiKey,
-        paddleClientToken: clientToken,
-        paddleWebhookSecret: webhookSecret,
-        paddleCurrency: data.paddle_currency || data.stripe_currency || 'eur',
+        enableStripe: data.enable_stripe !== undefined ? data.enable_stripe !== false : true,
+        stripeMode: data.stripe_mode || 'test',
+        stripePublishableKey: (data.stripe_publishable_key || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '').trim(),
+        stripeSecretKey: (data.stripe_secret_key || process.env.STRIPE_SECRET_KEY || '').trim(),
+        stripeWebhookSecret: (data.stripe_webhook_secret || '').trim(),
+        stripeCurrency: (data.stripe_currency || 'eur').toLowerCase(),
+        enablePaypal: data.enable_paypal !== undefined ? data.enable_paypal !== false : true,
+        paypalMode: (data.paypal_mode === 'live' ? 'live' : 'sandbox'),
+        paypalClientId: (data.paypal_client_id || process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || '').trim(),
+        paypalSecretKey: (data.paypal_secret_key || process.env.PAYPAL_SECRET_KEY || '').trim(),
+        paypalMeUrl: (data.paypal_me_url || process.env.NEXT_PUBLIC_PAYPAL_ME_URL || '').trim(),
+        paypalCurrency: (data.paypal_currency || 'eur').toLowerCase(),
         updatedAt: data.updated_at || new Date().toISOString(),
         updatedBy: data.updated_by || 'Admin',
       };
@@ -1048,12 +1045,6 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed.paddleClientToken && parsed.paddleClientToken.startsWith('pk_')) {
-          delete parsed.paddleClientToken;
-        }
-        if (!parsed.paddleApiKey || parsed.paddleApiKey.startsWith('sk_')) {
-          delete parsed.paddleApiKey;
-        }
         return {
           ...DEFAULT_AUTH_SETTINGS,
           ...parsed,
@@ -1109,13 +1100,19 @@ export const saveAuthSettings = async (
     humanitarian_text: settings.humanitarianText || '',
     humanitarian_organization_name: settings.humanitarianOrganizationName || 'Global Halal Emergency Food Relief',
     humanitarian_learn_more_url: settings.humanitarianLearnMoreUrl || 'https://allohalal.fr/humanitarian',
-    // Live Supabase table columns for credentials
-    enable_stripe: settings.enablePaddle !== false,
-    stripe_mode: settings.paddleMode === 'live' ? 'live' : 'test',
-    stripe_publishable_key: (settings.paddleClientToken || '').trim(),
-    stripe_secret_key: (settings.paddleApiKey || '').trim(),
-    stripe_webhook_secret: (settings.paddleWebhookSecret || '').trim(),
-    stripe_currency: (settings.paddleCurrency || 'eur').trim().toLowerCase(),
+    // Live Supabase table columns for Stripe & PayPal credentials
+    enable_stripe: settings.enableStripe !== false,
+    stripe_mode: settings.stripeMode === 'live' ? 'live' : 'test',
+    stripe_publishable_key: (settings.stripePublishableKey || '').trim(),
+    stripe_secret_key: (settings.stripeSecretKey || '').trim(),
+    stripe_webhook_secret: (settings.stripeWebhookSecret || '').trim(),
+    stripe_currency: (settings.stripeCurrency || 'eur').trim().toLowerCase(),
+    enable_paypal: settings.enablePaypal !== false,
+    paypal_mode: settings.paypalMode === 'live' ? 'live' : 'sandbox',
+    paypal_client_id: (settings.paypalClientId || '').trim(),
+    paypal_secret_key: (settings.paypalSecretKey || '').trim(),
+    paypal_me_url: (settings.paypalMeUrl || '').trim(),
+    paypal_currency: (settings.paypalCurrency || 'eur').trim().toLowerCase(),
     updated_at: new Date().toISOString(),
     updated_by: updatedBy,
   };
@@ -1479,8 +1476,8 @@ export const fetchContributions = async (): Promise<Contribution[]> => {
           amount: Number(item.amount || 0),
           currency: (item.currency || 'EUR').toUpperCase(),
           tier,
-          paymentMethod: (item.payment_method || 'PADDLE').toUpperCase(),
-          transactionId: item.transaction_id || item.paddle_transaction_id || item.stripe_session_id || item.id,
+          paymentMethod: (item.payment_method || 'STRIPE').toUpperCase(),
+          transactionId: item.transaction_id || item.stripe_session_id || item.id,
           message: item.message || item.moderator_note || '',
           status,
           isAnonymous: item.is_anonymous === true,
@@ -1504,11 +1501,16 @@ export const fetchContributions = async (): Promise<Contribution[]> => {
       try {
         const rawList = JSON.parse(cached);
         if (Array.isArray(rawList)) {
-          // Filter out legacy static demo items
+          // Strictly live server-synced items only: reject any mock IDs or test entries
           const sanitized: Contribution[] = rawList
             .filter((item: any) => {
               const id = String(item.id || '');
-              return id !== 'don_1' && id !== 'don_2' && id !== 'don_3' && id !== 'don_4' && id !== 'don_5' && id !== 'don_6';
+              return (
+                !id.startsWith('don_') &&
+                !id.startsWith('test_') &&
+                item.donorName !== 'Tariq Mansoor' &&
+                item.donorName !== 'Test Donor'
+              );
             })
             .map((item: any, idx: number) => ({
               id: item.id || `contrib_${Date.now()}_${idx}`,
@@ -1518,8 +1520,8 @@ export const fetchContributions = async (): Promise<Contribution[]> => {
               amount: Number(item.amount || 0),
               currency: item.currency || 'EUR',
               tier: item.tier || 'SERVER',
-              paymentMethod: item.paymentMethod || item.payment_method || 'PADDLE',
-              transactionId: item.transactionId || item.transaction_id || item.paddle_transaction_id,
+              paymentMethod: item.paymentMethod || item.payment_method || 'STRIPE',
+              transactionId: item.transactionId || item.transaction_id || item.stripe_session_id,
               message: item.message || item.moderatorNote || item.moderator_note || '',
               status: item.status === 'PENDING' ? 'PENDING' : item.status === 'REFUNDED' ? 'REFUNDED' : 'COMPLETED',
               isAnonymous: Boolean(item.isAnonymous ?? item.is_anonymous),

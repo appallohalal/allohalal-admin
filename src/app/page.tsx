@@ -317,9 +317,6 @@ export default function AdminDashboardPage() {
   };
 
   const handleRefreshContributions = async () => {
-    try {
-      await fetch('/api/paddle/sync-transactions', { method: 'POST' }).catch(() => {});
-    } catch (_) {}
     const updated = await fetchContributions();
     setContributions(updated);
   };

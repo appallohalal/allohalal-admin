@@ -497,12 +497,21 @@ ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_charity_s
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_text TEXT DEFAULT 'Allo Halal is driven by ethical and community values. In the spirit of Islamic solidarity, a dedicated portion of every free-will contribution is redirected towards verified humanitarian partners to provide emergency food aid and clean water for vulnerable families worldwide.';
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_organization_name TEXT DEFAULT 'Global Halal Emergency Food Relief';
 ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS humanitarian_learn_more_url TEXT DEFAULT 'https://allohalal.fr/humanitarian';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS enable_paddle BOOLEAN DEFAULT TRUE;
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_mode VARCHAR(16) DEFAULT 'sandbox';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_api_key TEXT DEFAULT '';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_client_token TEXT DEFAULT '';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_webhook_secret TEXT DEFAULT '';
-ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paddle_currency VARCHAR(8) DEFAULT 'eur';
+-- Stripe Payment Gateway Configuration
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS enable_stripe BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_mode VARCHAR(16) DEFAULT 'test';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_publishable_key TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_secret_key TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_webhook_secret TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS stripe_currency VARCHAR(8) DEFAULT 'eur';
+
+-- PayPal Payment Gateway Configuration
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS enable_paypal BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paypal_mode VARCHAR(16) DEFAULT 'sandbox';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paypal_client_id TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paypal_secret_key TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paypal_me_url TEXT DEFAULT '';
+ALTER TABLE public.auth_settings ADD COLUMN IF NOT EXISTS paypal_currency VARCHAR(8) DEFAULT 'eur';
 
 ALTER TABLE public.auth_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all for auth_settings" ON public.auth_settings;
@@ -514,9 +523,12 @@ ON CONFLICT (id) DO NOTHING;
 
 UPDATE public.auth_settings
 SET 
-  enable_paddle = TRUE,
-  paddle_mode = 'sandbox',
-  paddle_currency = 'eur'
+  enable_stripe = TRUE,
+  stripe_mode = 'test',
+  stripe_currency = 'eur',
+  enable_paypal = TRUE,
+  paypal_mode = 'sandbox',
+  paypal_currency = 'eur'
 WHERE id = 'global';
 
 -- ==============================================================================
@@ -549,7 +561,7 @@ CREATE TABLE IF NOT EXISTS public.contributions (
   amount NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
   currency VARCHAR(16) DEFAULT 'EUR',
   tier VARCHAR(32) DEFAULT 'SERVER', -- 'COFFEE', 'SERVER', 'GROWTH', 'PATRON'
-  payment_method VARCHAR(32) DEFAULT 'PADDLE', -- 'PADDLE', 'PAYPAL', 'APPLE_PAY', 'GOOGLE_PAY', 'MANUAL'
+  payment_method VARCHAR(32) DEFAULT 'STRIPE', -- 'STRIPE', 'PAYPAL', 'APPLE_PAY', 'GOOGLE_PAY', 'MANUAL'
   transaction_id VARCHAR(128),
   message TEXT,
   status VARCHAR(32) DEFAULT 'COMPLETED', -- 'COMPLETED', 'PENDING', 'REFUNDED'
@@ -565,9 +577,8 @@ ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS donor_location VARCHAR
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS amount NUMERIC(10, 2) DEFAULT 0.00;
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS currency VARCHAR(16) DEFAULT 'EUR';
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS tier VARCHAR(32) DEFAULT 'SERVER';
-ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS payment_method VARCHAR(32) DEFAULT 'PADDLE';
+ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS payment_method VARCHAR(32) DEFAULT 'STRIPE';
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS transaction_id VARCHAR(128);
-ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS paddle_transaction_id VARCHAR(128);
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(128);
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS message TEXT;
 ALTER TABLE public.contributions ADD COLUMN IF NOT EXISTS status VARCHAR(32) DEFAULT 'COMPLETED';

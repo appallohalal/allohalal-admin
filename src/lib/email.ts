@@ -480,3 +480,214 @@ export async function sendTestEmail(params: {
   const res = await sendSmtpEmail(cfg.smtpConfig, params.toEmail, finalSubject, html);
   return res;
 }
+
+/**
+ * Sends a confirmation email to the donor and an alert to admin@allo-halal.com
+ * when a contribution is successfully processed.
+ */
+export async function sendContributionEmails(params: {
+  donorEmail?: string;
+  donorName?: string;
+  amount: number;
+  currency?: string;
+  tier?: string;
+  transactionId?: string;
+  paymentMethod?: string;
+  message?: string;
+  originUrl?: string;
+}): Promise<{
+  donorResult?: { success: boolean; error?: string };
+  adminResult?: { success: boolean; error?: string };
+}> {
+  const cfg = await getActiveEmailConfig();
+  const hasSmtp = Boolean(cfg.smtpConfig.host && cfg.smtpConfig.user && cfg.smtpConfig.pass);
+
+  if (!hasSmtp) {
+    console.warn('[sendContributionEmails] SMTP credentials not configured.');
+    return {
+      donorResult: { success: false, error: 'SMTP not configured' },
+      adminResult: { success: false, error: 'SMTP not configured' },
+    };
+  }
+
+  const baseUrl =
+    params.originUrl ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    'https://allohalal-admin.vercel.app';
+
+  const currency = (params.currency || 'EUR').toUpperCase();
+  const symbol = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency;
+  const formattedAmount = `${Number(params.amount || 0).toFixed(2)} ${symbol}`;
+  const donorName = (params.donorName || '').trim() || 'Généreux Donateur';
+  const paymentMethod = (params.paymentMethod || 'STRIPE').toUpperCase();
+  const tier = (params.tier || 'SERVER').toUpperCase();
+  const txnId = params.transactionId || `tx_${Date.now()}`;
+  const dateStr = new Date().toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  let donorResult: { success: boolean; error?: string } | undefined;
+  let adminResult: { success: boolean; error?: string } | undefined;
+
+  // 1. Donor Confirmation Email
+  if (params.donorEmail && params.donorEmail.trim().includes('@')) {
+    const donorEmail = params.donorEmail.trim();
+    const donorSubject = `BarakAllahu Fik pour votre don de ${formattedAmount} à Allo Halal 💚`;
+    const donorHtml = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Merci pour votre contribution</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8fafc; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 540px; background: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.04);">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #088839 0%, #059669 100%); padding: 36px 30px; text-align: center;">
+              <div style="font-size: 40px; margin-bottom: 10px;">🤲</div>
+              <h1 style="margin: 0 0 6px 0; font-size: 24px; font-weight: 800; color: #ffffff;">BarakAllahu Fik !</h1>
+              <p style="margin: 0; font-size: 14px; color: #d1fae5; font-weight: 500;">Votre soutien donne vie à la communauté Allo Halal</p>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding: 32px 30px;">
+              <p style="font-size: 15px; line-height: 1.6; margin: 0 0 20px 0; color: #334155;">
+                Cher(e) <strong>${donorName}</strong>,
+              </p>
+              <p style="font-size: 14px; line-height: 1.6; margin: 0 0 24px 0; color: #475569;">
+                Nous confirmons la bonne réception de votre contribution libre. Grâce à votre générosité, nous pouvons continuer à proposer un service d'analyse Halal 100% indépendant, gratuit et sans abonnement obligatoire.
+              </p>
+
+              <!-- Receipt Box -->
+              <table role="presentation" width="100%" style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; padding: 18px 20px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #166534; font-weight: 600;">Montant de la contribution :</td>
+                  <td align="right" style="padding: 6px 0; font-size: 17px; color: #088839; font-weight: 800;">${formattedAmount}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #166534;">Mode de paiement :</td>
+                  <td align="right" style="padding: 6px 0; font-size: 13px; color: #15803d; font-weight: 600;">${paymentMethod}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #166534;">Palier de soutien :</td>
+                  <td align="right" style="padding: 6px 0; font-size: 13px; color: #15803d; font-weight: 600;">${tier}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #166534;">Date :</td>
+                  <td align="right" style="padding: 6px 0; font-size: 12px; color: #64748b; font-family: monospace;">${dateStr}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #166534;">Référence :</td>
+                  <td align="right" style="padding: 6px 0; font-size: 11px; color: #64748b; font-family: monospace;">${txnId}</td>
+                </tr>
+              </table>
+
+              <!-- Humanitarian Notice -->
+              <table role="presentation" width="100%" style="background-color: #f8fafc; border-left: 4px solid #088839; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px;">
+                <tr>
+                  <td style="font-size: 12px; color: #475569; line-height: 1.5;">
+                    🌱 <strong>Engagement solidaire :</strong> Une part de chaque contribution est reversée à des œuvres caritatives vérifiées pour l'aide alimentaire d'urgence.
+                  </td>
+                </tr>
+              </table>
+
+              <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0;">
+                Qu'Allah accepte votre don et bénisse vos actions.<br>
+                L'équipe <strong>Allo Halal</strong>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f1f5f9; padding: 18px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8;">
+                © ${new Date().getFullYear()} Allo Halal — Modèle à Prix Libre & Éthique.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+    donorResult = await sendSmtpEmail(cfg.smtpConfig, donorEmail, donorSubject, donorHtml);
+  }
+
+  // 2. Admin Alert Email (admin@allo-halal.com)
+  const adminEmail = 'admin@allo-halal.com';
+  const adminSubject = `🚨 [Nouveau Don] ${formattedAmount} reçu de ${donorName} (${paymentMethod})`;
+  const adminHtml = `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Notification Nouveau Don</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 25px; margin: 0; color: #1e293b;">
+  <div style="max-width: 520px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+    <div style="display: flex; align-items: center; margin-bottom: 16px;">
+      <span style="font-size: 26px; margin-right: 10px;">💰</span>
+      <div>
+        <h2 style="margin: 0; font-size: 18px; color: #088839;">Nouvelle Contribution Enregistrée !</h2>
+        <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">Allo Halal Admin Alert System</p>
+      </div>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin: 18px 0; background: #f8fafc; border-radius: 10px; overflow: hidden;">
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px 14px; font-weight: bold; color: #475569;">Montant :</td>
+        <td style="padding: 10px 14px; font-weight: 800; font-size: 16px; color: #088839;">${formattedAmount}</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px 14px; font-weight: bold; color: #475569;">Passerelle :</td>
+        <td style="padding: 10px 14px; font-weight: 600; color: #1e293b;">${paymentMethod}</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px 14px; font-weight: bold; color: #475569;">Palier :</td>
+        <td style="padding: 10px 14px; color: #1e293b;">${tier}</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px 14px; font-weight: bold; color: #475569;">Donateur :</td>
+        <td style="padding: 10px 14px; color: #1e293b;">${donorName}</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px 14px; font-weight: bold; color: #475569;">Email :</td>
+        <td style="padding: 10px 14px; color: #2563eb;">${params.donorEmail || 'Non renseigné'}</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #e2e8f0;">
+        <td style="padding: 10px 14px; font-weight: bold; color: #475569;">Transaction ID :</td>
+        <td style="padding: 10px 14px; font-family: monospace; font-size: 11px; color: #64748b;">${txnId}</td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 14px; font-weight: bold; color: #475569;">Date :</td>
+        <td style="padding: 10px 14px; font-size: 12px; color: #64748b;">${dateStr}</td>
+      </tr>
+    </table>
+
+    <div style="text-align: center; margin-top: 22px;">
+      <a href="${baseUrl}" style="display: inline-block; background-color: #088839; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: bold; padding: 10px 22px; border-radius: 10px;">
+        Accéder au panneau d'administration
+      </a>
+    </div>
+  </div>
+</body>
+</html>
+`;
+  adminResult = await sendSmtpEmail(cfg.smtpConfig, adminEmail, adminSubject, adminHtml);
+
+  return { donorResult, adminResult };
+}

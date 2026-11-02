@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { sendContributionEmails } from '@/lib/email';
 
 function corsHeaders() {
   return {
@@ -51,9 +52,10 @@ export async function POST(request: Request) {
     const amount = Number(body.amount || 0);
     const currency = (body.currency || 'EUR').toUpperCase();
     const tier = (body.tier || 'SERVER').toUpperCase();
-    const transactionId = body.transactionId || body.transaction_id || body.paddle_transaction_id || body.stripe_session_id || id;
+    const transactionId = body.transactionId || body.transaction_id || body.stripe_session_id || id;
     const message = body.message || 'Community Contribution via Allo Halal App';
     const status = (body.status || 'COMPLETED').toUpperCase();
+    const paymentMethod = body.paymentMethod || body.payment_method || (String(transactionId).startsWith('pi_') || String(transactionId).startsWith('cs_') ? 'STRIPE' : 'PAYPAL');
 
     const payload = {
       id,
@@ -62,9 +64,8 @@ export async function POST(request: Request) {
       amount,
       currency,
       tier,
-      payment_method: 'PADDLE',
+      payment_method: paymentMethod,
       transaction_id: transactionId,
-      paddle_transaction_id: transactionId,
       message,
       status,
       is_anonymous: false,
@@ -82,6 +83,22 @@ export async function POST(request: Request) {
         { success: false, error: error.message },
         { status: 500, headers: corsHeaders() }
       );
+    }
+
+    // Trigger confirmation e-mail to donor & alert e-mail to admin@allo-halal.com
+    try {
+      sendContributionEmails({
+        donorEmail: donorEmail,
+        donorName: donorName,
+        amount: amount,
+        currency: currency,
+        tier: tier,
+        transactionId: transactionId,
+        paymentMethod: paymentMethod,
+        message: message,
+      }).catch((e) => console.error('[sendContributionEmails v1 error]:', e));
+    } catch (e) {
+      console.error('[sendContributionEmails trigger error]:', e);
     }
 
     return NextResponse.json(

@@ -84,7 +84,7 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
 
   // Configuration Modal State
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
-  const [configTab, setConfigTab] = useState<'TEXTS' | 'PADDLE' | 'TIERS' | 'HUMANITARIAN'>('TEXTS');
+  const [configTab, setConfigTab] = useState<'TEXTS' | 'PAYMENT' | 'TIERS' | 'HUMANITARIAN'>('TEXTS');
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
   // Form State for Prix Libre Screen Texts ("Modèle à Prix Libre")
@@ -99,54 +99,38 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
       'Allo Halal refuse les abonnements payants obligatoires. Soutenez le projet librement selon vos moyens pour nous aider à financer les serveurs IA et le développement.'
   );
 
-  // Form State for Payment Gateway (Paddle Billing)
-  const [enablePaddle, setEnablePaddle] = useState<boolean>(
-    authSettings?.enablePaddle !== false
+  // Form State for Stripe Gateway
+  const [enableStripe, setEnableStripe] = useState<boolean>(
+    authSettings?.enableStripe !== false
   );
-  const [paddleMode, setPaddleMode] = useState<'sandbox' | 'live'>(
-    authSettings?.paddleMode || 'sandbox'
+  const [stripeMode, setStripeMode] = useState<'test' | 'live'>(
+    (authSettings?.stripeMode === 'live' ? 'live' : 'test')
   );
-  const [paddleClientToken, setPaddleClientToken] = useState<string>(
-    (authSettings?.paddleClientToken && !authSettings.paddleClientToken.startsWith('pk_'))
-      ? authSettings.paddleClientToken
-      : (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || DEFAULT_AUTH_SETTINGS.paddleClientToken || '')
+  const [stripePublishableKey, setStripePublishableKey] = useState<string>(
+    authSettings?.stripePublishableKey || ''
   );
-  const [paddleApiKey, setPaddleApiKey] = useState<string>(
-    (authSettings?.paddleApiKey && !authSettings.paddleApiKey.startsWith('sk_'))
-      ? authSettings.paddleApiKey
-      : (DEFAULT_AUTH_SETTINGS.paddleApiKey || '')
+  const [stripeSecretKey, setStripeSecretKey] = useState<string>(
+    authSettings?.stripeSecretKey || ''
   );
-  const [paddleCurrency, setPaddleCurrency] = useState<string>(
-    authSettings?.paddleCurrency || 'eur'
-  );
-  const [showApiKey, setShowApiKey] = useState<boolean>(false);
-  const [isTestingPaddle, setIsTestingPaddle] = useState<boolean>(false);
-  const [paddleTestResult, setPaddleTestResult] = useState<{
-    success?: boolean;
-    message?: string;
-  } | null>(null);
-  const [isRefreshingServer, setIsRefreshingServer] = useState<boolean>(false);
-  const [isSyncingPaddle, setIsSyncingPaddle] = useState<boolean>(false);
 
-  const handleSyncPaddle = async () => {
-    setIsSyncingPaddle(true);
-    try {
-      const res = await fetch('/api/paddle/sync-transactions', { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
-        toast.success(data.message || 'Transactions synchronized from Paddle!');
-        if (onRefresh) {
-          await onRefresh();
-        }
-      } else {
-        toast.error(data.error || 'Failed to sync with Paddle');
-      }
-    } catch (err: any) {
-      toast.error('Network error syncing with Paddle: ' + err.message);
-    } finally {
-      setIsSyncingPaddle(false);
-    }
-  };
+  // Form State for PayPal Gateway
+  const [enablePaypal, setEnablePaypal] = useState<boolean>(
+    authSettings?.enablePaypal !== false
+  );
+  const [paypalMode, setPaypalMode] = useState<'sandbox' | 'live'>(
+    authSettings?.paypalMode || 'sandbox'
+  );
+  const [paypalClientId, setPaypalClientId] = useState<string>(
+    authSettings?.paypalClientId || ''
+  );
+  const [paypalSecretKey, setPaypalSecretKey] = useState<string>(
+    authSettings?.paypalSecretKey || ''
+  );
+  const [paypalMeUrl, setPaypalMeUrl] = useState<string>(
+    authSettings?.paypalMeUrl || ''
+  );
+
+  const [isRefreshingServer, setIsRefreshingServer] = useState<boolean>(false);
 
   // Form State for Presets & Tiers Configuration
   const [presets, setPresets] = useState<number[]>(
@@ -226,23 +210,6 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
       if (authSettings.humanitarianText) setHumanitarianText(authSettings.humanitarianText);
       if (authSettings.humanitarianOrganizationName) setHumanitarianOrg(authSettings.humanitarianOrganizationName);
       if (authSettings.humanitarianLearnMoreUrl) setHumanitarianUrl(authSettings.humanitarianLearnMoreUrl);
-
-      setEnablePaddle(authSettings.enablePaddle !== false);
-      if (authSettings.paddleMode) setPaddleMode(authSettings.paddleMode);
-
-      const effectiveClientToken =
-        authSettings.paddleClientToken && !authSettings.paddleClientToken.startsWith('pk_')
-          ? authSettings.paddleClientToken
-          : (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || DEFAULT_AUTH_SETTINGS.paddleClientToken);
-      if (effectiveClientToken) setPaddleClientToken(effectiveClientToken);
-
-      const effectiveApiKey =
-        authSettings.paddleApiKey && !authSettings.paddleApiKey.startsWith('sk_')
-          ? authSettings.paddleApiKey
-          : DEFAULT_AUTH_SETTINGS.paddleApiKey;
-      if (effectiveApiKey) setPaddleApiKey(effectiveApiKey);
-
-      if (authSettings.paddleCurrency) setPaddleCurrency(authSettings.paddleCurrency);
     }
   }, [authSettings]);
 
@@ -402,7 +369,7 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
       (Number(d.amount) || 0).toFixed(2),
       d.currency || 'EUR',
       d.tier || 'SERVER',
-      d.paymentMethod || 'PADDLE',
+      d.paymentMethod || 'STRIPE',
       d.isAnonymous ? 'Yes' : 'No',
       `"${(d.message || '').replace(/"/g, '""')}"`,
       `"${new Date(d.createdAt).toISOString()}"`,
@@ -457,44 +424,6 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
     toast.success('Presets reset to standard €1, €3, €5, €10, €15.');
   };
 
-  const handleTestPaddleConnection = async () => {
-    if (!paddleApiKey.trim()) {
-      toast.error('Please enter your Paddle API Key to test connection.');
-      return;
-    }
-    setIsTestingPaddle(true);
-    setPaddleTestResult(null);
-    try {
-      const res = await fetch('/api/paddle/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: paddleApiKey, mode: paddleMode }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPaddleTestResult({
-          success: true,
-          message: data.message || `Connected to Paddle in ${data.mode.toUpperCase()} mode!`,
-        });
-        toast.success(data.message || 'Paddle API key validated successfully.', 'Paddle Verified');
-      } else {
-        setPaddleTestResult({
-          success: false,
-          message: data.error || 'Failed to authenticate with Paddle.',
-        });
-        toast.error(data.error || 'Failed to authenticate with Paddle.', 'Paddle Auth Failed');
-      }
-    } catch (err: any) {
-      setPaddleTestResult({
-        success: false,
-        message: err.message || 'Network error while testing connection.',
-      });
-      toast.error(err.message || 'Network error while testing connection.', 'Connection Error');
-    } finally {
-      setIsTestingPaddle(false);
-    }
-  };
-
   const handleRefreshServer = async () => {
     setIsRefreshingServer(true);
     try {
@@ -542,11 +471,15 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
         humanitarianText: humanitarianText.trim(),
         humanitarianOrganizationName: humanitarianOrg.trim(),
         humanitarianLearnMoreUrl: humanitarianUrl.trim(),
-        enablePaddle: enablePaddle,
-        paddleMode: paddleMode,
-        paddleApiKey: paddleApiKey.trim(),
-        paddleClientToken: paddleClientToken.trim(),
-        paddleCurrency: paddleCurrency.trim().toLowerCase(),
+        enableStripe: enableStripe,
+        stripeMode: stripeMode,
+        stripePublishableKey: stripePublishableKey.trim(),
+        stripeSecretKey: stripeSecretKey.trim(),
+        enablePaypal: enablePaypal,
+        paypalMode: paypalMode,
+        paypalClientId: paypalClientId.trim(),
+        paypalSecretKey: paypalSecretKey.trim(),
+        paypalMeUrl: paypalMeUrl.trim(),
         updatedAt: new Date().toISOString(),
         updatedBy: currentAdminName || 'Admin',
       };
@@ -605,13 +538,6 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
 
   const getPaymentMethodBadge = (method: string) => {
     switch (method) {
-      case 'PADDLE':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
-            <CreditCard className="w-3 h-3 text-emerald-500" />
-            Paddle
-          </span>
-        );
       case 'STRIPE':
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 font-mono">
@@ -711,13 +637,13 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
           </button>
         </div>
 
-        {/* Card B: Paddle Payment Gateway Configuration */}
+        {/* Card B: Stripe & PayPal Payment Gateways Configuration */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 min-w-0">
             <div
               className={`w-11 h-11 rounded-2xl shrink-0 flex items-center justify-center border shadow-xs ${
-                enablePaddle
-                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                enableStripe || enablePaypal
+                  ? 'bg-indigo-50 text-indigo-600 border-indigo-200'
                   : 'bg-slate-100 text-slate-400 border border-slate-200'
               }`}
             >
@@ -726,27 +652,29 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                  Paddle Gateway
+                  Stripe &amp; PayPal
                 </h2>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    paddleMode === 'live'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                    enableStripe
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                      : 'bg-slate-100 text-slate-500 border-slate-200'
                   }`}
                 >
-                  {paddleMode === 'live' ? 'Live' : 'Sandbox'}
+                  Stripe: {enableStripe ? (stripeMode === 'live' ? 'Live' : 'Test') : 'Off'}
                 </span>
-                {enablePaddle && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    Online
-                  </span>
-                )}
+                <span
+                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                    enablePaypal
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : 'bg-slate-100 text-slate-500 border-slate-200'
+                  }`}
+                >
+                  PayPal: {enablePaypal ? (paypalMode === 'live' ? 'Live' : 'Sandbox') : 'Off'}
+                </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
-                {paddleApiKey
-                  ? `API Key: ${paddleApiKey.slice(0, 10)}...`
-                  : 'Paddle API key not configured'}
+                {stripeSecretKey ? 'Stripe configuré' : 'Stripe sans clé'} • {paypalClientId ? 'PayPal configuré' : 'PayPal sans clé'}
               </p>
             </div>
           </div>
@@ -754,13 +682,13 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
           <button
             type="button"
             onClick={() => {
-              setConfigTab('PADDLE');
+              setConfigTab('PAYMENT');
               setIsConfigModalOpen(true);
             }}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-98 shrink-0"
+            className="px-3.5 py-2 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-98 shrink-0"
           >
-            <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Paddle</span>
+            <CreditCard className="w-3.5 h-3.5 text-indigo-600" />
+            <span>Stripe &amp; PayPal</span>
           </button>
         </div>
 
@@ -1079,8 +1007,7 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
               className="px-2.5 py-1.5 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 focus:ring-2 focus:ring-[#088839]/20 focus:border-[#088839]"
             >
               <option value="ALL">All Gateways</option>
-              <option value="PADDLE">Paddle</option>
-              <option value="STRIPE">Stripe (Legacy)</option>
+              <option value="STRIPE">Stripe</option>
               <option value="PAYPAL">PayPal</option>
               <option value="APPLE_PAY">Apple Pay</option>
               <option value="GOOGLE_PAY">Google Pay</option>
@@ -1111,18 +1038,6 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
               <option value="amount_desc">Highest Amount</option>
               <option value="amount_asc">Lowest Amount</option>
             </select>
-
-            {/* Sync Paddle Live Button */}
-            <button
-              type="button"
-              disabled={isSyncingPaddle}
-              onClick={handleSyncPaddle}
-              title="Synchronize live transactions directly from Paddle API"
-              className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-98 disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncingPaddle ? 'animate-spin' : ''}`} />
-              <span>{isSyncingPaddle ? 'Syncing...' : 'Sync Paddle'}</span>
-            </button>
           </div>
         </div>
 
@@ -1341,7 +1256,7 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                     Contributions &amp; Payment Gateway Configuration
                   </h3>
                   <p className="text-xs text-slate-500 font-medium">
-                    Configure Paddle API Credentials, presets (€1, €3, €5, €10, €15) &amp; humanitarian commitment
+                    Configure Stripe &amp; PayPal API Credentials, presets (€1, €3, €5, €10, €15) &amp; humanitarian commitment
                   </p>
                 </div>
               </div>
@@ -1367,15 +1282,15 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                 Screen Copy &amp; Texts
               </button>
               <button
-                onClick={() => setConfigTab('PADDLE')}
+                onClick={() => setConfigTab('PAYMENT')}
                 className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
-                  configTab === 'PADDLE'
-                    ? 'border-emerald-600 text-emerald-700'
+                  configTab === 'PAYMENT'
+                    ? 'border-indigo-600 text-indigo-700'
                     : 'border-transparent text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <CreditCard className="w-4 h-4 text-emerald-600" />
-                Paddle Payment Gateway
+                <CreditCard className="w-4 h-4 text-indigo-600" />
+                Stripe &amp; PayPal Gateways
               </button>
               <button
                 onClick={() => setConfigTab('TIERS')}
@@ -1458,174 +1373,197 @@ export const ContributionsManager: React.FC<ContributionsManagerProps> = ({
                 </div>
               )}
 
-              {/* TAB 1: PADDLE PAYMENT GATEWAY CONFIGURATION */}
-              {configTab === 'PADDLE' && (
-                <div className="space-y-5">
-                  {/* Paddle Master Switch & Environment */}
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center">
-                        <CreditCard className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
-                          Paddle Payment Processing
+              {/* TAB 1: STRIPE & PAYPAL PAYMENT GATEWAY CONFIGURATION */}
+              {configTab === 'PAYMENT' && (
+                <div className="space-y-6">
+                  {/* --- STRIPE SECTION --- */}
+                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center">
+                          <CreditCard className="w-5 h-5" />
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                          Accept debit/credit cards, Apple Pay, Google Pay, and localized payment methods via Paddle
-                        </p>
+                        <div>
+                          <div className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
+                            Stripe Payment Processing
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium">
+                            Accept Cards (Visa, Mastercard), Apple Pay, and Google Pay
+                          </p>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Environment Selector: Sandbox vs Live Production */}
+                    {/* Stripe Environment */}
                     <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div>
                         <span className="text-xs font-bold text-slate-700 block font-mono">
-                          Gateway Environment
+                          Stripe Environment
                         </span>
                         <span className="text-xs text-slate-500 font-medium">
-                          Switch between Sandbox testing and Live production payments
+                          Basculer entre Test (Sandbox) et Production (Live)
                         </span>
                       </div>
 
                       <div className="inline-flex rounded-xl bg-white p-1 border border-slate-200 shadow-2xs">
                         <button
                           type="button"
-                          onClick={() => setPaddleMode('sandbox')}
+                          onClick={() => setStripeMode('test')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            paddleMode === 'sandbox'
+                            stripeMode === 'test'
                               ? 'bg-amber-100 text-amber-900 shadow-xs'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          Sandbox Mode
+                          Test Mode
                         </button>
                         <button
                           type="button"
-                          onClick={() => setPaddleMode('live')}
+                          onClick={() => setStripeMode('live')}
                           className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            paddleMode === 'live'
-                              ? `${c.primaryBg} text-white shadow-xs`
+                            stripeMode === 'live'
+                              ? 'bg-indigo-600 text-white shadow-xs'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          Live Mode (Production)
+                          Live Mode
                         </button>
                       </div>
                     </div>
-                  </div>
 
-                  {/* API Credentials Configuration */}
-                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Lock className="w-4 h-4 text-slate-600" />
-                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700 font-mono">
-                          Paddle API Credentials ({paddleMode.toUpperCase()})
-                        </label>
-                      </div>
-                      {paddleMode === 'sandbox' && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPaddleClientToken(DEFAULT_AUTH_SETTINGS.paddleClientToken || '');
-                            setPaddleApiKey(DEFAULT_AUTH_SETTINGS.paddleApiKey || '');
-                            toast.success('Loaded default sandbox keys. Click "Save Configuration" to persist.', 'Defaults Applied');
-                          }}
-                          className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                        >
-                          Load Sandbox Defaults
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Client-side Token (Publishable Token) */}
+                    {/* Stripe Publishable Key */}
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1 font-mono">
-                        Client-side Token (Publishable Token)
+                        Stripe Publishable Key
                       </label>
                       <input
                         type="text"
-                        value={paddleClientToken}
-                        onChange={(e) => setPaddleClientToken(e.target.value)}
-                        placeholder={paddleMode === 'live' ? 'live_...' : 'test_...'}
+                        value={stripePublishableKey}
+                        onChange={(e) => setStripePublishableKey(e.target.value)}
+                        placeholder={stripeMode === 'live' ? 'pk_live_...' : 'pk_test_...'}
                         className={`${inputCls} font-mono`}
                       />
                       <p className="text-[11px] text-slate-500 mt-1 font-medium">
-                        Safe for client applications and Paddle.js initialization in web/mobile checkouts.
+                        Clé publique visible côté client pour Stripe Checkout.
                       </p>
                     </div>
 
-                    {/* Secret API Key with Test Connection */}
+                    {/* Stripe Secret Key */}
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-xs font-bold text-slate-700 font-mono">
-                          Secret API Key
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setShowApiKey(!showApiKey)}
-                          className="text-xs font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1 cursor-pointer"
-                        >
-                          {showApiKey ? (
-                            <>
-                              <EyeOff className="w-3.5 h-3.5" />
-                              <span>Hide</span>
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Reveal</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="flex gap-2">
-                        <input
-                          type={showApiKey ? 'text' : 'password'}
-                          value={paddleApiKey}
-                          onChange={(e) => setPaddleApiKey(e.target.value)}
-                          placeholder={paddleMode === 'live' ? 'pdl_live_...' : 'pdl_sdbx_...'}
-                          className={`${inputCls} font-mono flex-1`}
-                        />
-                        <button
-                          type="button"
-                          disabled={isTestingPaddle || !paddleApiKey.trim()}
-                          onClick={handleTestPaddleConnection}
-                          className="px-4 py-2 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer shrink-0 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
-                        >
-                          {isTestingPaddle ? (
-                            <span>Verifying...</span>
-                          ) : (
-                            <>
-                              <Zap className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>Test Connection</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1 font-mono">
+                        Stripe Secret Key
+                      </label>
+                      <input
+                        type="password"
+                        value={stripeSecretKey}
+                        onChange={(e) => setStripeSecretKey(e.target.value)}
+                        placeholder={stripeMode === 'live' ? 'sk_live_...' : 'sk_test_...'}
+                        className={`${inputCls} font-mono`}
+                      />
                       <p className="text-[11px] text-slate-500 mt-1 font-medium">
-                        Kept secure on the server. Used to create Paddle transactions and verify incoming payments.
+                        Conservée de manière sécurisée côté serveur pour initialiser les sessions de paiement.
                       </p>
+                    </div>
+                  </div>
 
-                      {/* Test Connection Result Feedback */}
-                      {paddleTestResult && (
-                        <div
-                          className={`mt-2.5 p-3 rounded-xl border flex items-center gap-2.5 text-xs font-medium ${
-                            paddleTestResult.success
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                              : 'bg-rose-50 text-rose-800 border-rose-200'
+                  {/* --- PAYPAL SECTION --- */}
+                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center">
+                          <DollarSign className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold uppercase tracking-wider text-slate-800 font-mono">
+                            PayPal Payment Processing
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium">
+                            Accept PayPal accounts and guest card checkout
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PayPal Environment */}
+                    <div className="pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <span className="text-xs font-bold text-slate-700 block font-mono">
+                          PayPal Environment
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium">
+                          Basculer entre Sandbox testing et Live PayPal
+                        </span>
+                      </div>
+
+                      <div className="inline-flex rounded-xl bg-white p-1 border border-slate-200 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => setPaypalMode('sandbox')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            paypalMode === 'sandbox'
+                              ? 'bg-amber-100 text-amber-900 shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
-                          {paddleTestResult.success ? (
-                            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
-                          ) : (
-                            <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
-                          )}
-                          <span>{paddleTestResult.message}</span>
-                        </div>
-                      )}
+                          Sandbox
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaypalMode('live')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            paypalMode === 'live'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Live Production
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* PayPal Client ID */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1 font-mono">
+                        PayPal Client ID
+                      </label>
+                      <input
+                        type="text"
+                        value={paypalClientId}
+                        onChange={(e) => setPaypalClientId(e.target.value)}
+                        placeholder="Ex: A21AAK7l8qN0_..."
+                        className={`${inputCls} font-mono`}
+                      />
+                    </div>
+
+                    {/* PayPal Secret Key */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1 font-mono">
+                        PayPal Secret Key
+                      </label>
+                      <input
+                        type="password"
+                        value={paypalSecretKey}
+                        onChange={(e) => setPaypalSecretKey(e.target.value)}
+                        placeholder="Ex: EK-98Y1m4a..."
+                        className={`${inputCls} font-mono`}
+                      />
+                    </div>
+
+                    {/* PayPal.me Fallback URL */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1 font-mono">
+                        Lien direct PayPal.me (Optionnel / Fallback)
+                      </label>
+                      <input
+                        type="text"
+                        value={paypalMeUrl}
+                        onChange={(e) => setPaypalMeUrl(e.target.value)}
+                        placeholder="Ex: https://paypal.me/allohalal"
+                        className={`${inputCls} font-mono`}
+                      />
+                      <p className="text-[11px] text-slate-500 mt-1 font-medium">
+                        Utilisé en redirection directe si les clés API ne sont pas encore saisies.
+                      </p>
                     </div>
                   </div>
                 </div>

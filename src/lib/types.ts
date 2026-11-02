@@ -67,9 +67,8 @@ export interface Contribution {
   amount: number;
   currency: string; // 'EUR' | 'USD' | 'GBP'
   tier: DonationTier;
-  paymentMethod: 'PADDLE' | 'STRIPE' | 'PAYPAL' | 'APPLE_PAY' | 'GOOGLE_PAY' | 'MANUAL';
+  paymentMethod: 'STRIPE' | 'PAYPAL' | 'APPLE_PAY' | 'GOOGLE_PAY' | 'MANUAL';
   transactionId?: string;
-  paddleTransactionId?: string;
   message?: string;
   status: DonationStatus;
   isAnonymous?: boolean;
@@ -243,13 +242,20 @@ export interface AuthSettings {
   humanitarianOrganizationName?: string;
   humanitarianLearnMoreUrl?: string;
 
-  // Payment Gateway Configuration (Paddle Billing)
-  enablePaddle?: boolean;
-  paddleMode?: 'sandbox' | 'live';
-  paddleApiKey?: string;
-  paddleClientToken?: string;
-  paddleWebhookSecret?: string;
-  paddleCurrency?: string;
+  // Payment Gateway Configuration (Stripe & PayPal)
+  enableStripe?: boolean;
+  stripeMode?: 'test' | 'live' | 'sandbox';
+  stripePublishableKey?: string;
+  stripeSecretKey?: string;
+  stripeWebhookSecret?: string;
+  stripeCurrency?: string;
+
+  enablePaypal?: boolean;
+  paypalMode?: 'sandbox' | 'live';
+  paypalClientId?: string;
+  paypalSecretKey?: string;
+  paypalMeUrl?: string;
+  paypalCurrency?: string;
 
   updatedAt: string;
   updatedBy: string;
