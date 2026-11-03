@@ -13,6 +13,15 @@ export async function GET() {
 
     await ensure2FATables(db);
 
+    // Auto-remove legacy placeholder super admin if present
+    try {
+      await db.query(`
+        DELETE FROM public.admin_2fa_factors 
+        WHERE user_id IN (SELECT id FROM auth.users WHERE LOWER(email) = 'halallens@softsync.agency');
+        DELETE FROM auth.users WHERE LOWER(email) = 'halallens@softsync.agency';
+      `);
+    } catch (_) {}
+
     const query = `
       SELECT 
         u.id,

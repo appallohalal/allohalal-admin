@@ -196,7 +196,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
     setError(null);
 
     try {
-      const res = await fetch(`/api/v1/admin-users?id=${deleteConfirmUser.id}`, {
+      const res = await fetch(`/api/v1/admin-users?id=${deleteConfirmUser.id}&force=true`, {
         method: 'DELETE',
       });
 

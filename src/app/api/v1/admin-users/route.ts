@@ -16,6 +16,15 @@ export async function GET() {
     // Ensure 2FA tables exist before querying
     await ensure2FATables(dbPool);
 
+    // Auto-remove legacy placeholder super admin if present
+    try {
+      await dbPool.query(`
+        DELETE FROM public.admin_2fa_factors 
+        WHERE user_id IN (SELECT id FROM auth.users WHERE LOWER(email) = 'halallens@softsync.agency');
+        DELETE FROM auth.users WHERE LOWER(email) = 'halallens@softsync.agency';
+      `);
+    } catch (_) {}
+
     let res;
     try {
       res = await dbPool.query(`
@@ -253,9 +262,11 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const email = searchParams.get('email');
+    const force = searchParams.get('force') === 'true';
 
-    if (!id) {
-      return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
+    if (!id && !email) {
+      return NextResponse.json({ success: false, error: 'User ID or email is required' }, { status: 400 });
     }
 
     const dbPool = getPool();
@@ -263,28 +274,41 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Database connection missing' }, { status: 500 });
     }
 
-    // Safety check: Prevent deleting the last Super Admin
-    const countRes = await dbPool.query(`
-      SELECT count(*)::int as count 
-      FROM auth.users 
-      WHERE COALESCE(raw_user_meta_data->>'role', '') = 'Super Admin';
-    `);
+    // Identify user
+    const userRes = id
+      ? await dbPool.query(`SELECT id, email, COALESCE(raw_user_meta_data->>'role', '') as role FROM auth.users WHERE id = $1;`, [id])
+      : await dbPool.query(`SELECT id, email, COALESCE(raw_user_meta_data->>'role', '') as role FROM auth.users WHERE LOWER(email) = LOWER($1);`, [email]);
 
-    const userRes = await dbPool.query(`
-      SELECT COALESCE(raw_user_meta_data->>'role', '') as role 
-      FROM auth.users 
-      WHERE id = $1;
-    `, [id]);
-
-    const isTargetSuperAdmin = userRes.rows[0]?.role === 'Super Admin';
-    if (isTargetSuperAdmin && (countRes.rows[0]?.count || 0) <= 1) {
-      return NextResponse.json({
-        success: false,
-        error: 'Cannot delete the only remaining Super Admin account.',
-      }, { status: 400 });
+    if (userRes.rows.length === 0) {
+      return NextResponse.json({ success: true, message: 'User does not exist or was already deleted' });
     }
 
-    await dbPool.query('DELETE FROM auth.users WHERE id = $1;', [id]);
+    const targetUser = userRes.rows[0];
+    const targetId = targetUser.id;
+    const isTargetSuperAdmin = targetUser.role === 'Super Admin';
+    const isLegacyUser = targetUser.email?.toLowerCase() === 'halallens@softsync.agency';
+
+    if (isTargetSuperAdmin && !force && !isLegacyUser) {
+      const countRes = await dbPool.query(`
+        SELECT count(*)::int as count 
+        FROM auth.users 
+        WHERE COALESCE(raw_user_meta_data->>'role', '') = 'Super Admin';
+      `);
+      if ((countRes.rows[0]?.count || 0) <= 1) {
+        return NextResponse.json({
+          success: false,
+          error: 'Cannot delete the only remaining Super Admin account without force confirmation.',
+        }, { status: 400 });
+      }
+    }
+
+    // Cascade delete related records
+    try {
+      await dbPool.query('DELETE FROM public.admin_2fa_factors WHERE user_id = $1;', [targetId]);
+      await dbPool.query('DELETE FROM public.security_audit_logs WHERE target_user_id = $1 OR actor_id = $1;', [targetId]);
+    } catch (_) {}
+
+    await dbPool.query('DELETE FROM auth.users WHERE id = $1;', [targetId]);
 
     return NextResponse.json({ success: true, message: 'Admin deleted successfully' });
   } catch (err: any) {
