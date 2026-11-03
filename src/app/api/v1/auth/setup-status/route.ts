@@ -29,9 +29,11 @@ export async function GET() {
       "SELECT count(*)::int as count FROM auth.users WHERE COALESCE(raw_user_meta_data->>'account_type', 'admin') != 'mobile_user' AND LOWER(email) != 'halallens@softsync.agency'"
     );
     const userCount = res.rows[0]?.count || 0;
+    const host = process.env.DATABASE_URL ? process.env.DATABASE_URL.split('@')[1]?.split('/')[0] : 'none';
     return NextResponse.json({
       isFirstUser: userCount === 0,
       userCount,
+      dbHost: host,
     });
   } catch (err: any) {
     console.error('Failed to query user count:', err.message);
