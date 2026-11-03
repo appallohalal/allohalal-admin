@@ -7,12 +7,27 @@ import { Pool } from 'pg';
 let pool: Pool | null = null;
 let tablesInitialized = false;
 
+const DEFAULT_DATABASE_URL =
+  'postgresql://postgres.mkqovvoarufmawtosfbi:i6nrCC%40%26TA%2Cf6B%40@aws-0-eu-west-1.pooler.supabase.com:5432/postgres';
+
+export function getDatabaseUrl(): string {
+  const current = process.env.DATABASE_URL;
+  // Automatically fallback if unset or pointing to legacy template project (Singapore / ap-southeast-1)
+  if (!current || current.includes('ap-southeast-1')) {
+    return DEFAULT_DATABASE_URL;
+  }
+  return current;
+}
+
 export function getDbPool(): Pool | null {
-  if (!pool && process.env.DATABASE_URL) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-    });
+  if (!pool) {
+    const connStr = getDatabaseUrl();
+    if (connStr) {
+      pool = new Pool({
+        connectionString: connStr,
+        ssl: { rejectUnauthorized: false },
+      });
+    }
   }
   return pool;
 }
