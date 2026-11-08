@@ -39,7 +39,10 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (!error && product) {
-      const finalStatus = product.manual_status || product.ai_status;
+      const isCertified = product.is_certified === true || Boolean(product.certifier);
+      const finalStatus =
+        product.manual_status ||
+        (isCertified && product.ai_status !== 'HARAM' ? 'HALAL' : product.ai_status);
 
       // Increment scan counter in background
       supabase
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
           detectedAdditives: product.detected_additives || [],
           ingredientsRaw: product.ingredients_raw,
           certifier: product.certifier || '',
-          isCertified: product.is_certified === true || Boolean(product.certifier),
+          isCertified,
           verifiedOfficial: product.verified_official === true,
           certificationDetails: product.certification_details || '',
         },
@@ -134,6 +137,7 @@ export async function POST(req: NextRequest) {
 
               const certifier = detectedCert ? detectedCert.certifierName : null;
               const isCertified = Boolean(detectedCert);
+              const initialStatus = isCertified ? 'HALAL' : 'MUSHBOOH';
 
               // Asynchronously cache to Supabase so future requests are instantaneous
               supabase
@@ -146,7 +150,7 @@ export async function POST(req: NextRequest) {
                     image_url: imageUrl,
                     ingredients_raw: ingredientsRaw,
                     detected_additives: additives,
-                    ai_status: 'MUSHBOOH',
+                    ai_status: initialStatus,
                     is_overridden: false,
                     certifier,
                     is_certified: isCertified,
@@ -165,7 +169,7 @@ export async function POST(req: NextRequest) {
                   name,
                   brand,
                   imageUrl,
-                  status: 'MUSHBOOH',
+                  status: initialStatus,
                   isOverridden: false,
                   moderatorNote: null,
                   detectedAdditives: additives,

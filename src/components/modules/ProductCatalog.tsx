@@ -28,6 +28,7 @@ import {
   UserCheck,
   ShieldCheck,
   Award,
+  Download,
 } from 'lucide-react';
 
 interface ProductCatalogProps {
@@ -260,9 +261,80 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     }
   };
 
+  const handleExportCSV = () => {
+    const listToExport = filtered.length > 0 ? filtered : products;
+    if (listToExport.length === 0) {
+      toast.info('No products available to export.', 'Export');
+      return;
+    }
+
+    const headers = [
+      'Barcode',
+      'Name',
+      'Brand',
+      'Status',
+      'AI Status',
+      'Manual Override Status',
+      'Is Overridden',
+      'Certifier',
+      'Is Certified',
+      'Official Verification (Allo Halal)',
+      'Moderator Note',
+      'Verified By',
+      'Additives',
+      'Scans Count',
+      'Created Date',
+      'Last Updated',
+    ];
+
+    const escapeCSV = (val: unknown): string => {
+      if (val === null || val === undefined) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = listToExport.map((p: Product) => {
+      const isCert = Boolean(p.isCertified || p.certifier);
+      const effectiveStatus = p.manualStatus || (isCert && p.aiStatus !== 'HARAM' ? 'HALAL' : p.aiStatus);
+      return [
+        escapeCSV(p.barcode),
+        escapeCSV(p.name),
+        escapeCSV(p.brand || ''),
+        escapeCSV(effectiveStatus),
+        escapeCSV(p.aiStatus),
+        escapeCSV(p.manualStatus || ''),
+        escapeCSV(p.isOverridden ? 'Yes' : 'No'),
+        escapeCSV(p.certifier || ''),
+        escapeCSV(isCert ? 'Yes' : 'No'),
+        escapeCSV(p.verifiedOfficial ? 'Yes' : 'No'),
+        escapeCSV(p.moderatorNote || ''),
+        escapeCSV(p.verifiedBy || ''),
+        escapeCSV((p.detectedAdditives || []).join(', ')),
+        escapeCSV(p.scansCount || 0),
+        escapeCSV(p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ''),
+        escapeCSV(p.lastScannedAt ? new Date(p.lastScannedAt).toLocaleDateString() : ''),
+      ].join(',');
+    });
+
+    // UTF-8 BOM so Excel opens accents and special characters cleanly without encoding issues
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('download', `allohalal_products_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Exported ${listToExport.length} product(s) to CSV successfully!`, 'CSV Export');
+  };
+
   return (
     <div className="space-y-6 pb-16">
-      {/* 1. Top Header Banner with "+ Add New Product" Button */}
+      {/* 1. Top Header Banner with "+ Add New Product" and "Export CSV" Buttons */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div
@@ -287,16 +359,28 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
           </div>
         </div>
 
-        {onSaveProduct && (
+        <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={openCreateModal}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-2 transition-all cursor-pointer active:scale-98 ${c.primaryBg} ${c.primaryBgHover}`}
+            onClick={handleExportCSV}
+            className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 shadow-2xs flex items-center gap-2 transition-all cursor-pointer active:scale-98"
+            title="Export products to CSV / Excel"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add New Product</span>
+            <Download className="w-4 h-4 text-slate-600" />
+            <span>Export CSV ({filtered.length})</span>
           </button>
-        )}
+
+          {onSaveProduct && (
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-2 transition-all cursor-pointer active:scale-98 ${c.primaryBg} ${c.primaryBgHover}`}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Product</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 2. Filters and Stats Bar */}

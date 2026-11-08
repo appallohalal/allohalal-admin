@@ -191,6 +191,9 @@ Internal Logic for Classification:
    - Purely plant-based items, minerals, synthetic chemicals.
    - Dairy (from Halal animals), Fish, and Eggs.
    - Specifically confirm "Plant-based Lecithin" or "Soy Lecithin" as Halal.
+4. "certification rule":
+   - If a recognized Halal certification organization (e.g. AVS, Achahada, Grande Mosquée de Paris, ARGML, Halal Correct, SFCVH, etc.) is detected on packaging, brand, or ingredients, all ambiguous additives, flavorings (arômes), and enzymes are vetted by that certification.
+   - A product with a recognized certifier MUST be classified as "halal" (NOT "doubtful" / "mushbooh"), unless an explicitly prohibited haram ingredient (such as pork or intoxicating alcohol) is present.
 
 Output JSON Structure (MANDATORY):
 {
@@ -457,6 +460,30 @@ Output JSON Structure (MANDATORY):
       Boolean(rawParsed.certification_detected) ||
       Boolean(detectedCertifier);
 
+    // Product Status Logic: If a recognized certifier is detected, ambiguous ingredients
+    // (such as arômes, emulsifiers, gelatin, enzymes) are certified and vetted by that organization.
+    // The product should NOT default to Mushbooh (doubtful); it displays as HALAL unless manually overridden or haram.
+    const hasManualOverride = Boolean(existingDbProduct?.is_overridden && existingDbProduct?.manual_status);
+    if (!hasManualOverride && (isCertified || detectedCertifier) && overallStatus !== 'haram' && !ingredientResults.some((i) => i.status === 'haram')) {
+      overallStatus = 'halal';
+      for (const ir of ingredientResults) {
+        if (ir.status === 'doubtful') {
+          ir.status = 'halal';
+          ir.reason = `Validé sous la certification halal (${detectedCertifier || 'Organisme reconnu'})`;
+        }
+      }
+    }
+
+    const haramIngredientsFinal = ingredientResults
+      .filter((i) => i.status === 'haram')
+      .map((i) => i.ingredient);
+    const doubtfulIngredientsFinal = ingredientResults
+      .filter((i) => i.status === 'doubtful')
+      .map((i) => i.ingredient);
+    const halalIngredientsFinal = ingredientResults
+      .filter((i) => i.status === 'halal')
+      .map((i) => i.ingredient);
+
     const verifiedOfficial = existingDbProduct?.verified_official === true;
 
     const finalResult = {
@@ -475,9 +502,9 @@ Output JSON Structure (MANDATORY):
       certificationDetails: existingDbProduct?.certification_details || '',
       ingredientResults,
       ingredients: ingredientResults,
-      haramIngredients,
-      doubtfulIngredients,
-      halalIngredients,
+      haramIngredients: haramIngredientsFinal,
+      doubtfulIngredients: doubtfulIngredientsFinal,
+      halalIngredients: halalIngredientsFinal,
     };
 
     // 4. Auto-save scanned barcode product to Supabase `products` table (if not already present)
