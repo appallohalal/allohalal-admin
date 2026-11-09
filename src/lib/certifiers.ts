@@ -30,7 +30,14 @@ export const KNOWN_CERTIFIERS: KnownCertifier[] = [
     shortName: 'ARGML',
     country: 'France',
     trustTier: 'GOLD',
-    keywords: ['argml', 'mosquée de lyon', 'mosquee de lyon', 'grande mosquée de lyon'],
+    keywords: [
+      'argml',
+      'mosquée de lyon',
+      'mosquee de lyon',
+      'grande mosquée de lyon',
+      'isla delice',
+      'isla délice',
+    ],
   },
   {
     id: 'sfcvh',
