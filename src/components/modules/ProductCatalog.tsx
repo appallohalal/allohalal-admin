@@ -56,6 +56,8 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   searchQuery,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | HalalStatus | 'OVERRIDDEN'>('ALL');
+  const [brandFilter, setBrandFilter] = useState<string>('ALL');
+  const [certifierFilter, setCertifierFilter] = useState<string>('ALL');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Add / Full Edit Product Modal state
@@ -212,6 +214,24 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setDeleteConfirmProduct(null);
   };
 
+  // Brand / Certifier dropdown options (case-insensitive grouping, sorted alphabetically)
+  const normalizeKey = (v?: string | null) => (v || '').trim().toLowerCase();
+  const buildOptions = (values: (string | undefined | null)[]) => {
+    const map = new Map<string, { label: string; count: number }>();
+    values.forEach((v) => {
+      const key = normalizeKey(v);
+      if (!key) return;
+      const existing = map.get(key);
+      if (existing) existing.count += 1;
+      else map.set(key, { label: (v || '').trim(), count: 1 });
+    });
+    return Array.from(map.entries())
+      .map(([value, { label, count }]) => ({ value, label, count }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  };
+  const brandOptions = buildOptions(products.map((p) => p.brand));
+  const certifierOptions = buildOptions(products.map((p) => p.certifier));
+
   // Filter products
   const filtered = products.filter((p) => {
     const q = searchQuery.toLowerCase();
@@ -222,6 +242,15 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
       p.ingredientsRaw.toLowerCase().includes(q);
 
     if (!matchesSearch) return false;
+
+    if (brandFilter !== 'ALL') {
+      const b = normalizeKey(p.brand);
+      if (brandFilter === '__NONE__' ? b !== '' : b !== brandFilter) return false;
+    }
+    if (certifierFilter !== 'ALL') {
+      const cf = normalizeKey(p.certifier);
+      if (certifierFilter === '__NONE__' ? cf !== '' : cf !== certifierFilter) return false;
+    }
 
     if (statusFilter === 'ALL') return true;
     if (statusFilter === 'OVERRIDDEN') return p.isOverridden;
@@ -443,6 +472,49 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
           >
             Manually Verified ({products.filter((p) => p.isOverridden).length})
           </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <select
+            value={brandFilter}
+            onChange={(e) => setBrandFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 cursor-pointer max-w-[220px]"
+            title="Filter by Brand"
+          >
+            <option value="ALL">All Brands ({brandOptions.length})</option>
+            <option value="__NONE__">No Brand</option>
+            {brandOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label} ({o.count})
+              </option>
+            ))}
+          </select>
+          <select
+            value={certifierFilter}
+            onChange={(e) => setCertifierFilter(e.target.value)}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 cursor-pointer max-w-[260px]"
+            title="Filter by Certifier"
+          >
+            <option value="ALL">All Certifiers ({certifierOptions.length})</option>
+            <option value="__NONE__">No Certifier</option>
+            {certifierOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label} ({o.count})
+              </option>
+            ))}
+          </select>
+          {(brandFilter !== 'ALL' || certifierFilter !== 'ALL') && (
+            <button
+              type="button"
+              onClick={() => {
+                setBrandFilter('ALL');
+                setCertifierFilter('ALL');
+              }}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer"
+            >
+              Clear
+            </button>
+          )}
         </div>
 
         <div className="text-xs text-slate-500 font-medium">
