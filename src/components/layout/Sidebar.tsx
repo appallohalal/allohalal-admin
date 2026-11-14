@@ -18,12 +18,15 @@ import {
 } from 'lucide-react';
 
 import { APP_COLORS } from '@/lib/colors';
+import { AdminUser } from '@/lib/auth';
+import { canAccessTab } from '@/lib/permissions';
 
 export type NavTab = 'dashboard' | 'products' | 'contributions' | 'additives' | 'cms' | 'users' | 'admins' | 'security' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
 
 interface SidebarProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
+  currentUser?: AdminUser | null;
   counts?: {
     pendingReviews: number;
     pendingContributions?: number;
@@ -33,7 +36,7 @@ interface SidebarProps {
   };
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, currentUser, counts }) => {
   const navItems = [
     {
       id: 'dashboard' as NavTab,
@@ -117,6 +120,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
     },
   ];
 
+  const visibleNavItems = navItems.filter((item) =>
+    canAccessTab(currentUser?.role, item.id)
+  );
+
   const c = APP_COLORS.classes;
 
   return (
@@ -134,7 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
                 Admin
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-medium">Admin Panel</p>
+            <p className="text-xs text-slate-500 font-medium">{currentUser?.role || 'Admin Panel'}</p>
           </div>
         </div>
       </div>
@@ -145,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, counts
           Navigation
         </div>
 
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
 

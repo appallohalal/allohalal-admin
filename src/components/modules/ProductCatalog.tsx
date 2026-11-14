@@ -31,6 +31,8 @@ import {
   Download,
 } from 'lucide-react';
 
+import { getRolePermissions } from '@/lib/permissions';
+
 interface ProductCatalogProps {
   products: Product[];
   onUpdateStatus: (
@@ -44,6 +46,7 @@ interface ProductCatalogProps {
   onSaveProduct?: (product: Product) => Promise<void> | void;
   onDeleteProduct?: (productId: string) => Promise<void> | void;
   currentAdminName?: string;
+  currentUserRole?: string;
   searchQuery: string;
 }
 
@@ -53,8 +56,10 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   onSaveProduct,
   onDeleteProduct,
   currentAdminName = 'Senior Halal Auditor',
+  currentUserRole = 'Super Admin',
   searchQuery,
 }) => {
+  const perms = getRolePermissions(currentUserRole);
   const [statusFilter, setStatusFilter] = useState<'ALL' | HalalStatus | 'OVERRIDDEN'>('ALL');
   const [brandFilter, setBrandFilter] = useState<string>('ALL');
   const [certifierFilter, setCertifierFilter] = useState<string>('ALL');
@@ -291,6 +296,10 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   };
 
   const handleExportCSV = () => {
+    if (!perms.canExportCSV) {
+      toast.error('Your role does not have permission to export CSV.', 'Permission Denied');
+      return;
+    }
     const listToExport = filtered.length > 0 ? filtered : products;
     if (listToExport.length === 0) {
       toast.info('No products available to export.', 'Export');
@@ -389,17 +398,25 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleExportCSV}
-            className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 shadow-2xs flex items-center gap-2 transition-all cursor-pointer active:scale-98"
-            title="Export products to CSV / Excel"
-          >
-            <Download className="w-4 h-4 text-slate-600" />
-            <span>Export CSV ({filtered.length})</span>
-          </button>
+          {!perms.canAddProduct && !perms.canEditProduct && (
+            <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
+              Read-Only Access
+            </span>
+          )}
 
-          {onSaveProduct && (
+          {perms.canExportCSV && (
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 shadow-2xs flex items-center gap-2 transition-all cursor-pointer active:scale-98"
+              title="Export products to CSV / Excel"
+            >
+              <Download className="w-4 h-4 text-slate-600" />
+              <span>Export CSV ({filtered.length})</span>
+            </button>
+          )}
+
+          {perms.canAddProduct && onSaveProduct && (
             <button
               type="button"
               onClick={openCreateModal}
@@ -547,7 +564,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                       Click "Add New Product" to manually add a product by barcode, or scan from the
                       mobile app.
                     </p>
-                    {onSaveProduct && (
+                    {perms.canAddProduct && onSaveProduct && (
                       <button
                         type="button"
                         onClick={openCreateModal}
@@ -667,16 +684,18 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                       {/* Actions */}
                       <td className="py-4 px-4 text-right whitespace-nowrap">
                         <div className="inline-flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => openOverrideModal(product)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder} hover:bg-blue-100`}
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>Override</span>
-                          </button>
+                          {perms.canOverrideProduct && (
+                            <button
+                              type="button"
+                              onClick={() => openOverrideModal(product)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder} hover:bg-blue-100`}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                              <span>Override</span>
+                            </button>
+                          )}
 
-                          {onSaveProduct && (
+                          {perms.canEditProduct && onSaveProduct && (
                             <button
                               type="button"
                               onClick={() => openFullEditModal(product)}
@@ -687,7 +706,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                             </button>
                           )}
 
-                          {onDeleteProduct && (
+                          {perms.canDeleteProduct && onDeleteProduct && (
                             <button
                               type="button"
                               onClick={() => setDeleteConfirmProduct(product)}
@@ -697,6 +716,14 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           )}
+
+                          {!perms.canOverrideProduct &&
+                            !perms.canEditProduct &&
+                            !perms.canDeleteProduct && (
+                              <span className="text-[11px] font-medium text-slate-400 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100">
+                                View Only
+                              </span>
+                            )}
                         </div>
                       </td>
                     </tr>

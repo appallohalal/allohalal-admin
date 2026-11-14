@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Additive, HalalStatus } from '@/lib/types';
 import { SUPPORTED_LANGUAGES, SupportedLanguage } from '@/lib/languages';
+import { getRolePermissions } from '@/lib/permissions';
 import {
   BookOpenCheck,
   Plus,
@@ -24,6 +25,7 @@ interface AdditivesDictionaryProps {
   additives: Additive[];
   onSaveAdditive: (additive: Additive) => void;
   onDeleteAdditive: (id: string) => void;
+  currentUserRole?: string;
   searchQuery: string;
 }
 
@@ -31,8 +33,10 @@ export const AdditivesDictionary: React.FC<AdditivesDictionaryProps> = ({
   additives,
   onSaveAdditive,
   onDeleteAdditive,
+  currentUserRole = 'Super Admin',
   searchQuery,
 }) => {
+  const perms = getRolePermissions(currentUserRole);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAdditive, setEditingAdditive] = useState<Additive | null>(null);
   const [activeLangCode, setActiveLangCode] = useState<string>('en');
@@ -196,21 +200,25 @@ export const AdditivesDictionary: React.FC<AdditivesDictionaryProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <button
-            onClick={exportForFlutter}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors"
-          >
-            <Download className="w-4 h-4 text-slate-500" />
-            Export Mobile JSON
-          </button>
+          {perms.canExportAdditives && (
+            <button
+              onClick={exportForFlutter}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors"
+            >
+              <Download className="w-4 h-4 text-slate-500" />
+              Export Mobile JSON
+            </button>
+          )}
 
-          <button
-            onClick={openNewModal}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all hover:scale-105"
-          >
-            <Plus className="w-4 h-4" />
-            Add New E-Number
-          </button>
+          {perms.canAddAdditive && (
+            <button
+              onClick={openNewModal}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all hover:scale-105"
+            >
+              <Plus className="w-4 h-4" />
+              Add New E-Number
+            </button>
+          )}
         </div>
       </div>
 
@@ -293,24 +301,33 @@ export const AdditivesDictionary: React.FC<AdditivesDictionaryProps> = ({
                     {/* Actions */}
                     <td className="py-4 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition-colors"
-                          title="Edit Translations"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (confirm(`Are you sure you want to delete ${item.code}?`)) {
-                              onDeleteAdditive(item.id);
-                            }
-                          }}
-                          className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-                          title="Delete Additive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {perms.canEditAdditive && (
+                          <button
+                            onClick={() => openEditModal(item)}
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition-colors"
+                            title="Edit Translations"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {perms.canDeleteAdditive && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete ${item.code}?`)) {
+                                onDeleteAdditive(item.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
+                            title="Delete Additive"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {!perms.canEditAdditive && !perms.canDeleteAdditive && (
+                          <span className="text-[11px] font-medium text-slate-400 px-2 py-1 rounded-lg bg-slate-50 border border-slate-100">
+                            View Only
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -29,16 +29,25 @@ export async function GET(req: NextRequest) {
 
     if (userId) {
       query = `
-        SELECT f.id, f.is_enabled, f.status, f.setup_at, f.locked_until
-        FROM public.admin_2fa_factors f
-        WHERE f.user_id = $1
+        SELECT
+          u.id as user_id,
+          u.raw_user_meta_data->>'name' as name,
+          COALESCE(u.raw_user_meta_data->>'role', 'Halal Auditor') as role,
+          f.id, f.is_enabled, f.status, f.setup_at, f.locked_until
+        FROM auth.users u
+        LEFT JOIN public.admin_2fa_factors f ON f.user_id = u.id
+        WHERE u.id = $1
       `;
       params = [userId];
     } else {
       query = `
-        SELECT f.id, f.is_enabled, f.status, f.setup_at, f.locked_until
-        FROM public.admin_2fa_factors f
-        JOIN auth.users u ON u.id = f.user_id
+        SELECT
+          u.id as user_id,
+          u.raw_user_meta_data->>'name' as name,
+          COALESCE(u.raw_user_meta_data->>'role', 'Halal Auditor') as role,
+          f.id, f.is_enabled, f.status, f.setup_at, f.locked_until
+        FROM auth.users u
+        LEFT JOIN public.admin_2fa_factors f ON f.user_id = u.id
         WHERE LOWER(u.email) = LOWER($1)
       `;
       params = [email as string];
@@ -49,6 +58,7 @@ export async function GET(req: NextRequest) {
     if (res.rowCount === 0) {
       return NextResponse.json({
         success: true,
+        userExists: false,
         isEnabled: false,
         status: 'disabled',
         setupAt: null,
@@ -60,9 +70,12 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      userExists: true,
+      role: row.role || 'Halal Auditor',
+      name: row.name || null,
       isEnabled: Boolean(row.is_enabled && row.status === 'active'),
-      status: row.status,
-      setupAt: row.setup_at,
+      status: row.status || 'disabled',
+      setupAt: row.setup_at || null,
       isLocked,
     });
   } catch (err: unknown) {

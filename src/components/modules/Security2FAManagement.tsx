@@ -57,7 +57,10 @@ export const Security2FAManagement: React.FC<Security2FAManagementProps> = ({
   // Filters & Tabs
   const [filterQuery, setFilterQuery] = useState(searchQuery);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ENABLED' | 'DISABLED'>('ALL');
-  const [activeTab, setActiveTab] = useState<'STAFF' | 'AUDIT_TRAIL'>('STAFF');
+  const [activeTab, setActiveTab] = useState<'STAFF' | 'AUDIT_TRAIL'>(
+    isSuperAdmin ? 'STAFF' : 'AUDIT_TRAIL'
+  );
+  const effectiveTab: 'STAFF' | 'AUDIT_TRAIL' = isSuperAdmin ? activeTab : 'AUDIT_TRAIL';
 
   // Audit Logs Pagination (10 per page)
   const [logsPage, setLogsPage] = useState(1);
@@ -374,62 +377,66 @@ export const Security2FAManagement: React.FC<Security2FAManagementProps> = ({
         </div>
       </div>
 
-      {/* 2. Overview Metric Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Total Staff</span>
-            <Users className="w-4 h-4 text-slate-400" />
+      {/* 2. Overview Metric Cards Grid (Super Admin Team View Only) */}
+      {isSuperAdmin && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Total Staff</span>
+              <Users className="w-4 h-4 text-slate-400" />
+            </div>
+            <div className="text-2xl font-black text-slate-900 mt-2">{stats.totalCount}</div>
           </div>
-          <div className="text-2xl font-black text-slate-900 mt-2">{stats.totalCount}</div>
-        </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-[#088839]">
-            <span className="text-[11px] font-bold uppercase tracking-wider">2FA Protected</span>
-            <ShieldCheck className="w-4 h-4 text-[#088839]" />
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between text-[#088839]">
+              <span className="text-[11px] font-bold uppercase tracking-wider">2FA Protected</span>
+              <ShieldCheck className="w-4 h-4 text-[#088839]" />
+            </div>
+            <div className="text-2xl font-black text-[#088839] mt-2">{stats.enabledCount}</div>
+            <p className="text-[11px] text-[#066d2e] font-semibold mt-1">
+              {stats.protectionRate}% coverage
+            </p>
           </div>
-          <div className="text-2xl font-black text-[#088839] mt-2">{stats.enabledCount}</div>
-          <p className="text-[11px] text-[#066d2e] font-semibold mt-1">
-            {stats.protectionRate}% coverage
-          </p>
-        </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-amber-600">
-            <span className="text-[11px] font-bold uppercase tracking-wider">2FA Inactive</span>
-            <ShieldAlert className="w-4 h-4 text-amber-600" />
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between text-amber-600">
+              <span className="text-[11px] font-bold uppercase tracking-wider">2FA Inactive</span>
+              <ShieldAlert className="w-4 h-4 text-amber-600" />
+            </div>
+            <div className="text-2xl font-black text-amber-700 mt-2">{stats.disabledCount}</div>
           </div>
-          <div className="text-2xl font-black text-amber-700 mt-2">{stats.disabledCount}</div>
-        </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-purple-600">
-            <span className="text-[11px] font-bold uppercase tracking-wider">Super Admins</span>
-            <Crown className="w-4 h-4 text-purple-600" />
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <div className="flex items-center justify-between text-purple-600">
+              <span className="text-[11px] font-bold uppercase tracking-wider">Super Admins</span>
+              <Crown className="w-4 h-4 text-purple-600" />
+            </div>
+            <div className="text-2xl font-black text-purple-700 mt-2">{stats.superAdminCount}</div>
           </div>
-          <div className="text-2xl font-black text-purple-700 mt-2">{stats.superAdminCount}</div>
         </div>
-      </div>
+      )}
 
       {/* 3. Section Navigation Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-        <button
-          onClick={() => setActiveTab('STAFF')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'STAFF'
-              ? `${c.primaryBg} text-white shadow-xs`
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>Team Members ({users.length})</span>
-        </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => setActiveTab('STAFF')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              effectiveTab === 'STAFF'
+                ? `${c.primaryBg} text-white shadow-xs`
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Team Members ({users.length})</span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTab('AUDIT_TRAIL')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'AUDIT_TRAIL'
+            effectiveTab === 'AUDIT_TRAIL'
               ? `${c.primaryBg} text-white shadow-xs`
               : 'text-slate-600 hover:bg-slate-100'
           }`}
@@ -440,7 +447,7 @@ export const Security2FAManagement: React.FC<Security2FAManagementProps> = ({
       </div>
 
       {/* 4. Tab A: Staff 2FA Table */}
-      {activeTab === 'STAFF' && (
+      {effectiveTab === 'STAFF' && (
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
           {/* Search & Filter Bar */}
           <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -663,7 +670,7 @@ export const Security2FAManagement: React.FC<Security2FAManagementProps> = ({
       )}
 
       {/* 5. Tab B: Security Audit Trail */}
-      {activeTab === 'AUDIT_TRAIL' && (
+      {effectiveTab === 'AUDIT_TRAIL' && (
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-900">Security Audit Logs</h3>

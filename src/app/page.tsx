@@ -60,6 +60,8 @@ import {
   deleteContribution,
 } from '@/lib/storage';
 import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, CmsSettings, Contribution, DonationStatus } from '@/lib/types';
+import { getRolePermissions, canAccessTab } from '@/lib/permissions';
+import { toast } from '@/lib/toast';
 import { ToastContainer } from '@/components/ui/ToastContainer';
 
 const VALID_TABS: NavTab[] = [
@@ -129,6 +131,10 @@ export default function AdminDashboardPage() {
   }, []);
 
   const handleTabChange = (tab: NavTab) => {
+    if (currentUser && !canAccessTab(currentUser.role, tab)) {
+      toast.error('Your role does not have access to this section.', 'Access Restricted');
+      return;
+    }
     setActiveTab(tab);
     setSearchQuery('');
     if (typeof window !== 'undefined') {
@@ -139,20 +145,38 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const loadDashboardData = async () => {
+  // Ensure activeTab is always within currentUser's allowedTabs
+  useEffect(() => {
+    if (!currentUser) return;
+    if (!canAccessTab(currentUser.role, activeTab)) {
+      const fallback = getRolePermissions(currentUser.role).defaultTab;
+      setActiveTab(fallback);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('halallens_admin_active_tab', fallback);
+          window.history.replaceState(null, '', `#${fallback}`);
+        } catch (_) {}
+      }
+    }
+  }, [currentUser, activeTab]);
+
+  const loadDashboardData = async (role?: string) => {
+    const perms = getRolePermissions(role || currentUser?.role);
     try {
       const [prods, adds, usrs, adList, logList, admob, groq, authSet, cmsSet, contribs] =
         await Promise.all([
-          fetchProducts(),
-          fetchAdditives(),
-          fetchUsers(),
-          fetchAds(),
-          fetchLogs(),
-          fetchAdMobSettings(),
-          fetchGroqSettings(),
-          fetchAuthSettings(),
-          fetchCmsSettings(),
-          fetchContributions(),
+          perms.canViewProducts ? fetchProducts() : Promise.resolve([]),
+          perms.canViewAdditives ? fetchAdditives() : Promise.resolve([]),
+          perms.canViewAppUsers ? fetchUsers() : Promise.resolve([]),
+          perms.canManageSystemSettings ? fetchAds() : Promise.resolve([]),
+          perms.canViewActivityLogs ? fetchLogs() : Promise.resolve([]),
+          perms.canManageSystemSettings ? fetchAdMobSettings() : Promise.resolve(DEFAULT_ADMOB_SETTINGS),
+          perms.canManageSystemSettings ? fetchGroqSettings() : Promise.resolve(DEFAULT_GROQ_SETTINGS),
+          perms.canManageSystemSettings || perms.canViewAppUsers
+            ? fetchAuthSettings()
+            : Promise.resolve(DEFAULT_AUTH_SETTINGS),
+          perms.canManageSystemSettings ? fetchCmsSettings() : Promise.resolve(DEFAULT_CMS_SETTINGS),
+          perms.role === 'Super Admin' ? fetchContributions() : Promise.resolve([]),
         ]);
       setProducts(prods);
       setAdditives(adds);
@@ -186,7 +210,7 @@ export default function AdminDashboardPage() {
 
         if (user) {
           setCurrentUser(user);
-          await loadDashboardData();
+          await loadDashboardData(user.role);
         }
       } catch (err) {
         console.error('Error loading initial session:', err);
@@ -204,7 +228,7 @@ export default function AdminDashboardPage() {
     };
   }, []);
 
-  // Handlers connected to Supabase
+  // Handlers connected to Supabase (guarded by role permissions)
   const handleUpdateProductStatus = async (
     productId: string,
     status: HalalStatus,
@@ -213,21 +237,43 @@ export default function AdminDashboardPage() {
     certifier?: string,
     verifiedOfficial?: boolean
   ) => {
+    if (!getRolePermissions(currentUser?.role).canOverrideProduct) {
+      toast.error('Your role cannot override product verdicts.', 'Permission Denied');
+      return;
+    }
     const updated = await updateProductStatus(productId, status, note, verifiedBy, certifier, verifiedOfficial);
     setProducts(updated);
   };
 
   const handleSaveProduct = async (product: Product) => {
+    const perms = getRolePermissions(currentUser?.role);
+    const isExisting = Boolean(product.id && !product.id.startsWith('prod-'));
+    if (isExisting && !perms.canEditProduct) {
+      toast.error('Your role cannot edit existing products.', 'Permission Denied');
+      return;
+    }
+    if (!isExisting && !perms.canAddProduct) {
+      toast.error('Your role cannot add products.', 'Permission Denied');
+      return;
+    }
     const updated = await saveProduct(product);
     setProducts(updated);
   };
 
   const handleDeleteProduct = async (productId: string) => {
+    if (!getRolePermissions(currentUser?.role).canDeleteProduct) {
+      toast.error('Your role cannot delete products.', 'Permission Denied');
+      return;
+    }
     const updated = await deleteProduct(productId);
     setProducts(updated);
   };
 
   const handleQuickVerify = async (productId: string, status: HalalStatus) => {
+    if (!getRolePermissions(currentUser?.role).canOverrideProduct) {
+      toast.error('Your role cannot override product verdicts.', 'Permission Denied');
+      return;
+    }
     const defaultNote =
       status === 'HALAL'
         ? 'Verified 100% Halal by Auditor Review'
@@ -242,26 +288,52 @@ export default function AdminDashboardPage() {
   };
 
   const handleSaveAdditive = async (additive: Additive) => {
+    const perms = getRolePermissions(currentUser?.role);
+    const isExisting = Boolean(additive.id && !additive.id.startsWith('add-'));
+    if (isExisting && !perms.canEditAdditive) {
+      toast.error('Your role cannot edit existing dictionary entries.', 'Permission Denied');
+      return;
+    }
+    if (!isExisting && !perms.canAddAdditive) {
+      toast.error('Your role cannot add dictionary entries.', 'Permission Denied');
+      return;
+    }
     const updated = await saveAdditive(additive);
     setAdditives(updated);
   };
 
   const handleDeleteAdditive = async (id: string) => {
+    if (!getRolePermissions(currentUser?.role).canDeleteAdditive) {
+      toast.error('Your role cannot delete dictionary entries.', 'Permission Denied');
+      return;
+    }
     const updated = await deleteAdditive(id);
     setAdditives(updated);
   };
 
   const handleToggleBan = async (userId: string, reason?: string) => {
+    if (!getRolePermissions(currentUser?.role).canViewAppUsers) {
+      toast.error('Permission denied.', 'Access Restricted');
+      return;
+    }
     const updated = await toggleUserBan(userId, reason);
     setUsers(updated);
   };
 
   const handleTogglePremium = async (userId: string) => {
+    if (!getRolePermissions(currentUser?.role).canViewAppUsers) {
+      toast.error('Permission denied.', 'Access Restricted');
+      return;
+    }
     const updated = await toggleUserPremium(userId);
     setUsers(updated);
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (!getRolePermissions(currentUser?.role).canViewAppUsers) {
+      toast.error('Permission denied.', 'Access Restricted');
+      return;
+    }
     const updated = await deleteUserAccount(userId);
     setUsers(updated);
   };
@@ -351,7 +423,7 @@ export default function AdminDashboardPage() {
         onAuthSuccess={async (user) => {
           setIsLoaded(false);
           setCurrentUser(user);
-          await loadDashboardData();
+          await loadDashboardData(user.role);
           setIsLoaded(true);
         }}
       />
@@ -373,6 +445,7 @@ export default function AdminDashboardPage() {
       <Sidebar
         activeTab={activeTab}
         onTabChange={handleTabChange}
+        currentUser={currentUser}
         counts={counts}
       />
 
@@ -403,18 +476,19 @@ export default function AdminDashboardPage() {
               />
             )}
 
-            {activeTab === 'products' && (
+            {activeTab === 'products' && canAccessTab(currentUser?.role, 'products') && (
               <ProductCatalog
                 products={products}
                 onUpdateStatus={handleUpdateProductStatus}
                 onSaveProduct={handleSaveProduct}
                 onDeleteProduct={handleDeleteProduct}
                 currentAdminName={currentUser?.name}
+                currentUserRole={currentUser?.role}
                 searchQuery={searchQuery}
               />
             )}
 
-            {activeTab === 'contributions' && (
+            {activeTab === 'contributions' && canAccessTab(currentUser?.role, 'contributions') && (
               <ContributionsManager
                 contributions={contributions}
                 onDelete={handleDeleteContribution}
@@ -428,16 +502,17 @@ export default function AdminDashboardPage() {
               />
             )}
 
-            {activeTab === 'additives' && (
+            {activeTab === 'additives' && canAccessTab(currentUser?.role, 'additives') && (
               <AdditivesDictionary
                 additives={additives}
                 onSaveAdditive={handleSaveAdditive}
                 onDeleteAdditive={handleDeleteAdditive}
+                currentUserRole={currentUser?.role}
                 searchQuery={searchQuery}
               />
             )}
 
-            {activeTab === 'cms' && (
+            {activeTab === 'cms' && canAccessTab(currentUser?.role, 'cms') && (
               <AppCmsManager
                 settings={cmsSettings}
                 onSave={handleSaveCmsSettings}
@@ -445,7 +520,7 @@ export default function AdminDashboardPage() {
               />
             )}
 
-            {activeTab === 'users' && (
+            {activeTab === 'users' && canAccessTab(currentUser?.role, 'users') && (
               <UserManagement
                 users={users}
                 onToggleBan={handleToggleBan}
@@ -458,25 +533,25 @@ export default function AdminDashboardPage() {
               />
             )}
 
-            {activeTab === 'admins' && (
+            {activeTab === 'admins' && canAccessTab(currentUser?.role, 'admins') && (
               <AdminManagement
                 currentUser={currentUser}
                 searchQuery={searchQuery}
               />
             )}
 
-            {activeTab === 'security' && (
+            {activeTab === 'security' && canAccessTab(currentUser?.role, 'security') && (
               <Security2FAManagement
                 currentUser={currentUser}
                 searchQuery={searchQuery}
               />
             )}
 
-            {activeTab === 'notifications' && (
+            {activeTab === 'notifications' && canAccessTab(currentUser?.role, 'notifications') && (
               <NotificationManager currentUser={currentUser || undefined} users={users} />
             )}
 
-            {activeTab === 'admob' && (
+            {activeTab === 'admob' && canAccessTab(currentUser?.role, 'admob') && (
               <AdMobSettingsView
                 settings={admobSettings}
                 onSave={handleSaveAdMob}
@@ -484,7 +559,7 @@ export default function AdminDashboardPage() {
               />
             )}
 
-            {activeTab === 'ads' && (
+            {activeTab === 'ads' && canAccessTab(currentUser?.role, 'ads') && (
               <GeoAds
                 ads={ads}
                 onSaveAd={handleSaveAd}
@@ -494,7 +569,7 @@ export default function AdminDashboardPage() {
               />
             )}
 
-            {activeTab === 'analytics' && (
+            {activeTab === 'analytics' && canAccessTab(currentUser?.role, 'analytics') && (
               <AnalyticsDashboard
                 products={products}
                 users={users}
@@ -503,7 +578,7 @@ export default function AdminDashboardPage() {
               />
             )}
 
-            {activeTab === 'logs' && (
+            {activeTab === 'logs' && canAccessTab(currentUser?.role, 'logs') && (
               <GroqLogs
                 logs={logs}
                 settings={groqSettings}

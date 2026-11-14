@@ -134,6 +134,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          actorId: currentUser?.id,
           name: newName,
           email: newEmail,
           password: newPassword,
@@ -170,6 +171,7 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          actorId: currentUser?.id,
           id: editRoleUser.id,
           role: selectedRole,
         }),
@@ -196,9 +198,12 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
     setError(null);
 
     try {
-      const res = await fetch(`/api/v1/admin-users?id=${deleteConfirmUser.id}&force=true`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(
+        `/api/v1/admin-users?id=${deleteConfirmUser.id}&actorId=${currentUser?.id || ''}&force=true`,
+        {
+          method: 'DELETE',
+        }
+      );
 
       const data = await res.json();
       if (data.success) {
@@ -612,10 +617,10 @@ export const AdminManagement: React.FC<AdminManagementProps> = ({
                   onChange={(e) => setNewRole(e.target.value as AdminUser['role'])}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-emerald-500 focus:bg-white transition-colors"
                 >
-                  <option value="Halal Auditor">Halal Auditor (Verification & Dictionaries)</option>
-                  <option value="Chief Auditor">Chief Auditor (Products & Overrides)</option>
-                  <option value="System Admin">System Admin (Infrastructure & Logs)</option>
-                  <option value="Super Admin">Super Admin (Full Platform Authority)</option>
+                  <option value="Halal Auditor">Halal Auditor (Data Entry — View & Add Products/Dictionaries)</option>
+                  <option value="Chief Auditor">Chief Auditor (Catalog Manager — Full Products & Dictionaries)</option>
+                  <option value="System Admin">System Admin (Technical — Settings, Infrastructure & Logs)</option>
+                  <option value="Super Admin">Super Admin (Full Access — All Modules & Team)</option>
                 </select>
               </div>
 

@@ -63,10 +63,20 @@ export const checkAuthSetupStatus = async (): Promise<AuthSetupStatus> => {
   return { isFirstUser: false, userCount: 1 };
 };
 
-export const formatSupabaseUser = (user: SupabaseUser): AdminUser => {
+export const formatSupabaseUser = (
+  user: SupabaseUser,
+  overrides?: { role?: string | null; name?: string | null }
+): AdminUser => {
   const metadata = user.user_metadata || {};
-  const name = metadata.name || user.email?.split('@')[0] || 'Admin';
-  const role: AdminUser['role'] = metadata.role || 'Super Admin';
+  const name = overrides?.name || metadata.name || user.email?.split('@')[0] || 'Admin';
+  const rawRole = overrides?.role || metadata.role;
+  const role: AdminUser['role'] =
+    rawRole === 'Super Admin' ||
+    rawRole === 'Chief Auditor' ||
+    rawRole === 'Halal Auditor' ||
+    rawRole === 'System Admin'
+      ? rawRole
+      : 'Halal Auditor';
   const initials =
     name
       .split(' ')
@@ -97,11 +107,20 @@ export const getStoredAuthUser = async (): Promise<AdminUser | null> => {
         return null;
       }
 
-      // Check if 2FA is active for this account
+      let liveRole: string | undefined;
+      let liveName: string | undefined;
+
+      // Check if 2FA is active for this account and fetch live role from DB
       try {
         const res = await fetch(`/api/v1/auth/2fa/status?userId=${session.user.id}`);
         if (res.ok) {
           const status = await res.json();
+          if (status.userExists === false) {
+            await supabase.auth.signOut();
+            return null;
+          }
+          if (status.role) liveRole = status.role;
+          if (status.name) liveName = status.name;
           if (status.isEnabled) {
             // Check if current browser session passed 2FA verification
             const isVerified =
@@ -117,7 +136,7 @@ export const getStoredAuthUser = async (): Promise<AdminUser | null> => {
         console.warn('2FA verification check warning:', checkErr);
       }
 
-      return formatSupabaseUser(session.user);
+      return formatSupabaseUser(session.user, { role: liveRole, name: liveName });
     }
   } catch (err) {
     console.warn('Supabase getSession warning:', err);
@@ -155,18 +174,23 @@ export const loginAdmin = async (
       };
     }
 
-    // Check if 2FA is required for this account
+    let liveRole: string | undefined;
+    let liveName: string | undefined;
+
+    // Check if 2FA is required for this account and fetch live role
     try {
       const res = await fetch(`/api/v1/auth/2fa/status?userId=${data.user.id}`);
       if (res.ok) {
         const statusData = await res.json();
+        if (statusData.role) liveRole = statusData.role;
+        if (statusData.name) liveName = statusData.name;
         if (statusData.isEnabled) {
           return {
             success: true,
             requires2FA: true,
             factorId: data.user.id,
             challengeId: 'totp',
-            user: formatSupabaseUser(data.user),
+            user: formatSupabaseUser(data.user, { role: liveRole, name: liveName }),
           };
         }
       }
@@ -181,7 +205,7 @@ export const loginAdmin = async (
 
     return {
       success: true,
-      user: formatSupabaseUser(data.user),
+      user: formatSupabaseUser(data.user, { role: liveRole, name: liveName }),
     };
   } catch (err: any) {
     return { success: false, error: err.message || 'Authentication failed.' };

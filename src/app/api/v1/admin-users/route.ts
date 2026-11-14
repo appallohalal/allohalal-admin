@@ -102,10 +102,29 @@ export async function GET() {
   }
 }
 
+// Helper: verify actor is a Super Admin when actorId is supplied
+async function verifySuperAdminActor(dbPool: any, actorId?: string | null): Promise<boolean> {
+  if (!actorId) return true;
+  const r = await dbPool.query(
+    `SELECT COALESCE(raw_user_meta_data->>'role', 'Halal Auditor') as role FROM auth.users WHERE id = $1`,
+    [actorId]
+  );
+  if (r.rowCount === 0) return false;
+  return r.rows[0].role === 'Super Admin';
+}
+
 // POST create / invite new admin user
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, password, role } = await req.json();
+    const { actorId, name, email, password, role } = await req.json();
+
+    const dbPool = getPool();
+    if (dbPool && actorId && !(await verifySuperAdminActor(dbPool, actorId))) {
+      return NextResponse.json(
+        { success: false, error: 'Permission denied. Only Super Admins can create staff accounts.' },
+        { status: 403 }
+      );
+    }
 
     if (!name || !email || !password) {
       return NextResponse.json({ success: false, error: 'Name, email, and password are required' }, { status: 400 });
@@ -135,7 +154,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Auto-confirm email so they can log in immediately
-    const dbPool = getPool();
     if (dbPool) {
       await dbPool.query(`
         UPDATE auth.users 
@@ -182,7 +200,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, role, name, action } = body;
+    const { actorId, id, role, name, action } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'User ID is required' }, { status: 400 });
@@ -191,6 +209,13 @@ export async function PATCH(req: NextRequest) {
     const dbPool = getPool();
     if (!dbPool) {
       return NextResponse.json({ success: false, error: 'Database connection missing' }, { status: 500 });
+    }
+
+    if (actorId && !(await verifySuperAdminActor(dbPool, actorId))) {
+      return NextResponse.json(
+        { success: false, error: 'Permission denied. Only Super Admins can update staff roles.' },
+        { status: 403 }
+      );
     }
 
     // Reset 2FA action for Super Admin
@@ -263,6 +288,7 @@ export async function DELETE(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const email = searchParams.get('email');
+    const actorId = searchParams.get('actorId');
     const force = searchParams.get('force') === 'true';
 
     if (!id && !email) {
@@ -272,6 +298,13 @@ export async function DELETE(req: NextRequest) {
     const dbPool = getPool();
     if (!dbPool) {
       return NextResponse.json({ success: false, error: 'Database connection missing' }, { status: 500 });
+    }
+
+    if (actorId && !(await verifySuperAdminActor(dbPool, actorId))) {
+      return NextResponse.json(
+        { success: false, error: 'Permission denied. Only Super Admins can delete staff accounts.' },
+        { status: 403 }
+      );
     }
 
     // Identify user

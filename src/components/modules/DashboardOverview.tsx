@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Product, Additive, UserAccount, GeoAd, GroqApiLog, HalalStatus } from '@/lib/types';
 import { AdminUser } from '@/lib/auth';
+import { getRolePermissions, canAccessTab } from '@/lib/permissions';
 import { NavTab } from '@/components/layout/Sidebar';
 import {
   ScanLine,
@@ -43,6 +44,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   onNavigateTab,
   onQuickVerify,
 }) => {
+  const perms = getRolePermissions(currentUser?.role);
   const [timeframe, setTimeframe] = useState<'7D' | '30D'>('7D');
   const [hoveredPointIndex, setHoveredPointIndex] = useState<number | null>(null);
 
@@ -185,16 +187,28 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
         </div>
 
-        {/* Registered Users */}
-        <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs">
-          <div className="text-xs font-medium text-slate-500">Registered App Users</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5 font-mono">
-            {users.length.toLocaleString()}
+        {/* Registered Users or Catalog Products (when App Users access is restricted) */}
+        {perms.canViewAppUsers ? (
+          <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs">
+            <div className="text-xs font-medium text-slate-500">Registered App Users</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1.5 font-mono">
+              {users.length.toLocaleString()}
+            </div>
+            <div className="text-[11px] text-slate-500 font-medium mt-1">
+              <span className="font-semibold text-purple-700">{premiumCount}</span> Pro subscribers
+            </div>
           </div>
-          <div className="text-[11px] text-slate-500 font-medium mt-1">
-            <span className="font-semibold text-purple-700">{premiumCount}</span> Pro subscribers
+        ) : (
+          <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs">
+            <div className="text-xs font-medium text-slate-500">Catalog Products</div>
+            <div className="text-2xl font-bold text-slate-900 mt-1.5 font-mono">
+              {products.length.toLocaleString()}
+            </div>
+            <div className="text-[11px] text-emerald-700 font-semibold mt-1">
+              {halalCount} verified Halal items
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Groq AI Speed */}
         <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-2xs">
@@ -420,14 +434,16 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-100">
-            <button
-              onClick={() => onNavigateTab('additives')}
-              className="w-full py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors flex items-center justify-center gap-1.5"
-            >
-              Additives Dictionary ({additives.length}) <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            </button>
-          </div>
+          {perms.canViewAdditives && (
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                onClick={() => onNavigateTab('additives')}
+                className="w-full py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors flex items-center justify-center gap-1.5"
+              >
+                Additives Dictionary ({additives.length}) <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -484,22 +500,26 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => onQuickVerify(p.id, 'HALAL')}
-                            className="p-1 rounded bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 transition-colors"
-                            title="Approve as Halal"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => onQuickVerify(p.id, 'HARAM')}
-                            className="p-1 rounded bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 transition-colors"
-                            title="Flag as Haram"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        {perms.canOverrideProduct ? (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => onQuickVerify(p.id, 'HALAL')}
+                              className="p-1 rounded bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 transition-colors"
+                              title="Approve as Halal"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => onQuickVerify(p.id, 'HARAM')}
+                              className="p-1 rounded bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border border-slate-200 transition-colors"
+                              title="Flag as Haram"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-medium text-slate-400">View Only</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -536,12 +556,14 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             ))}
           </div>
 
-          <button
-            onClick={() => onNavigateTab('ads')}
-            className="w-full py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors flex items-center justify-center gap-1"
-          >
-            Manage Campaigns <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-          </button>
+          {canAccessTab(currentUser?.role, 'ads') && (
+            <button
+              onClick={() => onNavigateTab('ads')}
+              className="w-full py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors flex items-center justify-center gap-1"
+            >
+              Manage Campaigns <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          )}
         </div>
       </div>
     </div>
