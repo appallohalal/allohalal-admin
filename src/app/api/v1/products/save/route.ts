@@ -50,19 +50,45 @@ async function getFcmAccessToken(): Promise<{ accessToken: string; projectId: st
   }
 }
 
+function sanitizeTopic(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\-_.~%]/g, '_');
+}
+
 async function notifyUnknownProductSubscribers(db: any, barcode: string, productName: string) {
   try {
     const subs = await db.query(
-      `SELECT id, fcm_token, user_email
+      `SELECT id, fcm_token, user_email, user_id
        FROM public.unknown_product_submissions
        WHERE barcode = $1 AND notify_when_ready = true AND notified_at IS NULL`,
       [barcode]
     );
     if (!subs.rowCount) return;
 
-    const tokens = subs.rows
-      .map((r: any) => r.fcm_token)
-      .filter((t: any) => typeof t === 'string' && t.trim().length > 0);
+    const tokens: string[] = Array.from(
+      new Set(
+        subs.rows
+          .map((r: any) => r.fcm_token)
+          .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
+      )
+    );
+
+    const topics: string[] = Array.from(
+      new Set(
+        subs.rows.flatMap((r: any) => {
+          const out: string[] = [];
+          if (typeof r.user_email === 'string' && r.user_email.trim().length > 0) {
+            out.push(`user_${sanitizeTopic(r.user_email)}`);
+          }
+          if (typeof r.user_id === 'string' && r.user_id.trim().length > 0) {
+            out.push(`user_${sanitizeTopic(r.user_id)}`);
+          }
+          return out;
+        })
+      )
+    );
 
     const emails: string[] = Array.from(
       new Set(
@@ -72,33 +98,36 @@ async function notifyUnknownProductSubscribers(db: any, barcode: string, product
       )
     );
 
-    if (tokens.length > 0) {
+    if (tokens.length > 0 || topics.length > 0) {
       const auth = await getFcmAccessToken();
       if (auth) {
-        await Promise.all(
-          tokens.map((token: string) =>
-            fetch(`https://fcm.googleapis.com/v1/projects/${auth.projectId}/messages:send`, {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${auth.accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                message: {
-                  token,
-                  notification: {
-                    title: 'Fiche produit disponible !',
-                    body: `${productName} (${barcode}) a été ajouté au catalogue Allo Halal.`,
-                  },
-                  data: {
-                    type: 'product_ready',
-                    barcode,
-                  },
+        const fcmEndpoint = `https://fcm.googleapis.com/v1/projects/${auth.projectId}/messages:send`;
+        const sendPayload = (target: { token?: string; topic?: string }) =>
+          fetch(fcmEndpoint, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${auth.accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: {
+                ...target,
+                notification: {
+                  title: 'Fiche produit disponible !',
+                  body: `${productName} (${barcode}) a été ajouté au catalogue Allo Halal.`,
                 },
-              }),
-            }).catch(() => null)
-          )
-        );
+                data: {
+                  type: 'product_ready',
+                  barcode,
+                },
+              },
+            }),
+          }).catch(() => null);
+
+        await Promise.all([
+          ...tokens.map((token) => sendPayload({ token })),
+          ...topics.map((topic) => sendPayload({ topic })),
+        ]);
       }
     }
 
