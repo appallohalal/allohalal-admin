@@ -34,10 +34,16 @@ export const fetchProducts = async (): Promise<Product[]> => {
       const mapped: Product[] = data.map((item: any) => ({
         id: item.id,
         barcode: item.barcode,
-        name: item.name,
+        name: item.name || '',
+        nameI18n:
+          item.name_i18n && typeof item.name_i18n === 'object' ? item.name_i18n : {},
         brand: item.brand || '',
         imageUrl: item.image_url,
         ingredientsRaw: item.ingredients_raw || '',
+        ingredientsI18n:
+          item.ingredients_i18n && typeof item.ingredients_i18n === 'object'
+            ? item.ingredients_i18n
+            : {},
         detectedAdditives: item.detected_additives || [],
         aiStatus: item.ai_status || 'MUSHBOOH',
         manualStatus: item.manual_status,

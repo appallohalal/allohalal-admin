@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
         product: {
           barcode: product.barcode,
           name: product.name,
+          nameI18n:
+            product.name_i18n && typeof product.name_i18n === 'object' ? product.name_i18n : {},
           brand: product.brand,
           imageUrl: product.image_url,
           status: finalStatus,
@@ -68,6 +70,10 @@ export async function POST(req: NextRequest) {
           verifiedBy: product.verified_by,
           detectedAdditives: product.detected_additives || [],
           ingredientsRaw: product.ingredients_raw,
+          ingredientsI18n:
+            product.ingredients_i18n && typeof product.ingredients_i18n === 'object'
+              ? product.ingredients_i18n
+              : {},
           certifier: product.certifier || '',
           certificationStatus: product.certification_status || (isCertified ? 'certified' : 'unknown'),
           hasPackagingLogo: product.has_packaging_logo === true,

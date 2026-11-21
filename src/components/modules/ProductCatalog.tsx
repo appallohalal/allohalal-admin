@@ -104,7 +104,10 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const [productCertDetails, setProductCertDetails] = useState('');
   const [userAlertsI18n, setUserAlertsI18n] = useState<Record<string, string[]>>({ fr: [] });
   const [activeAlertLang, setActiveAlertLang] = useState<string>('fr');
-  const ALERT_LANGS = ['fr', 'en', 'ar', 'de', 'es', 'it', 'pt', 'ru', 'tr'];
+  const [nameI18n, setNameI18n] = useState<Record<string, string>>({});
+  const [ingredientsI18n, setIngredientsI18n] = useState<Record<string, string>>({});
+  const [activeContentLang, setActiveContentLang] = useState<string>('fr');
+  const ALERT_LANGS = ['fr', 'en', 'ar', 'de', 'es', 'it', 'pt', 'ru', 'tr', 'bn', 'ur', 'id', 'hi', 'zh'];
   const [certificationStatus, setCertificationStatus] = useState<'certified' | 'not_found' | 'unknown'>('unknown');
   const [hasPackagingLogo, setHasPackagingLogo] = useState(false);
   const [certificateExpiresAt, setCertificateExpiresAt] = useState('');
@@ -142,6 +145,9 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setProductCertDetails('');
     setUserAlertsI18n({ fr: [] });
     setActiveAlertLang('fr');
+    setNameI18n(prefill?.name ? { fr: prefill.name } : {});
+    setIngredientsI18n(prefill?.ingredientsRaw ? { fr: prefill.ingredientsRaw } : {});
+    setActiveContentLang('fr');
     setCertificationStatus('unknown');
     setHasPackagingLogo(false);
     setCertificateExpiresAt('');
@@ -185,6 +191,17 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     }
     setUserAlertsI18n(existingI18n);
     setActiveAlertLang('fr');
+    const existingNameI18n: Record<string, string> =
+      p.nameI18n && typeof p.nameI18n === 'object' ? { ...p.nameI18n } : {};
+    if (!existingNameI18n.fr && p.name) existingNameI18n.fr = p.name;
+    setNameI18n(existingNameI18n);
+    const existingIngredientsI18n: Record<string, string> =
+      p.ingredientsI18n && typeof p.ingredientsI18n === 'object' ? { ...p.ingredientsI18n } : {};
+    if (!existingIngredientsI18n.fr && p.ingredientsRaw) {
+      existingIngredientsI18n.fr = p.ingredientsRaw;
+    }
+    setIngredientsI18n(existingIngredientsI18n);
+    setActiveContentLang('fr');
     setCertificationStatus(
       p.certificationStatus || (p.isCertified || p.certifier ? 'certified' : 'unknown')
     );
@@ -271,13 +288,34 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
           : 'certified'
         : certificationStatus;
 
+    const cleanNameI18n: Record<string, string> = {};
+    for (const [lang, val] of Object.entries(nameI18n)) {
+      const s = (val || '').trim();
+      if (s) cleanNameI18n[lang] = s;
+    }
+    if (cleanName && !cleanNameI18n.fr) cleanNameI18n.fr = cleanName;
+    const effectiveName = cleanNameI18n.fr || cleanName || Object.values(cleanNameI18n)[0] || '';
+
+    const cleanIngredientsI18n: Record<string, string> = {};
+    for (const [lang, val] of Object.entries(ingredientsI18n)) {
+      const s = (val || '').trim();
+      if (s) cleanIngredientsI18n[lang] = s;
+    }
+    if (ingredientsRaw.trim() && !cleanIngredientsI18n.fr) {
+      cleanIngredientsI18n.fr = ingredientsRaw.trim();
+    }
+    const effectiveIngredients =
+      cleanIngredientsI18n.fr || ingredientsRaw.trim() || Object.values(cleanIngredientsI18n)[0] || '';
+
     const newProduct: Product = {
       id: fullEditProduct ? fullEditProduct.id : `prod-${Date.now()}`,
       barcode: cleanBarcode,
-      name: cleanName,
+      name: effectiveName,
+      nameI18n: cleanNameI18n,
       brand: brand.trim() || 'Unknown Brand',
       imageUrl: imageUrl.trim() || undefined,
-      ingredientsRaw: ingredientsRaw.trim(),
+      ingredientsRaw: effectiveIngredients,
+      ingredientsI18n: cleanIngredientsI18n,
       detectedAdditives: parsedAdditives,
       aiStatus: fullEditProduct ? fullEditProduct.aiStatus : productStatus,
       manualStatus: productStatus,
@@ -905,19 +943,59 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                   />
                 </div>
 
+                {/* Multi-language Content Tabs (Product Name & Ingredients) */}
+                <div className="md:col-span-2 bg-slate-50/80 border border-slate-200/80 rounded-xl p-3 space-y-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-700">
+                      Langue du contenu (Nom &amp; Ingrédients)
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {ALERT_LANGS.map((lang) => {
+                        const hasText = Boolean(
+                          (nameI18n[lang] || '').trim() || (ingredientsI18n[lang] || '').trim()
+                        );
+                        return (
+                          <button
+                            key={lang}
+                            type="button"
+                            onClick={() => setActiveContentLang(lang)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border transition-all cursor-pointer ${
+                              activeContentLang === lang
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : hasText
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            {lang}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Product Name */}
                 <div className="md:col-span-2">
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
                     <PackagePlus className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Product Name *</span>
+                    <span>Product Name ({activeContentLang.toUpperCase()}) *</span>
                   </label>
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Roasted Vermicelli / Dark Chocolate Bar 100g"
+                    value={
+                      activeContentLang === 'fr'
+                        ? nameI18n.fr ?? name
+                        : nameI18n[activeContentLang] || ''
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNameI18n({ ...nameI18n, [activeContentLang]: val });
+                      if (activeContentLang === 'fr') setName(val);
+                    }}
+                    placeholder={`[${activeContentLang.toUpperCase()}] e.g. Roasted Vermicelli / Dark Chocolate Bar 100g`}
                     className={inputCls}
-                    required
+                    required={activeContentLang === 'fr' && !name.trim()}
                   />
                 </div>
 
@@ -954,15 +1032,23 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 <div className="md:col-span-2">
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
                     <FileText className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Ingredients List *</span>
+                    <span>Ingredients List ({activeContentLang.toUpperCase()}) *</span>
                   </label>
                   <textarea
                     rows={3}
-                    value={ingredientsRaw}
-                    onChange={(e) => setIngredientsRaw(e.target.value)}
-                    placeholder="Wheat flour, sugar, vegetable oil (palm), soy lecithin (E322), salt..."
+                    value={
+                      activeContentLang === 'fr'
+                        ? ingredientsI18n.fr ?? ingredientsRaw
+                        : ingredientsI18n[activeContentLang] || ''
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setIngredientsI18n({ ...ingredientsI18n, [activeContentLang]: val });
+                      if (activeContentLang === 'fr') setIngredientsRaw(val);
+                    }}
+                    placeholder={`[${activeContentLang.toUpperCase()}] Wheat flour, sugar, vegetable oil (palm), soy lecithin (E322), salt...`}
                     className={inputCls}
-                    required
+                    required={activeContentLang === 'fr' && !ingredientsRaw.trim()}
                   />
                 </div>
               </div>

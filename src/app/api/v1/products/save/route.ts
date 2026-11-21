@@ -173,9 +173,11 @@ export async function POST(req: NextRequest) {
       id,
       barcode,
       name,
+      nameI18n,
       brand,
       imageUrl,
       ingredientsRaw,
+      ingredientsI18n,
       detectedAdditives,
       aiStatus,
       manualStatus,
@@ -205,6 +207,12 @@ export async function POST(req: NextRequest) {
     if (!db) {
       return NextResponse.json({ success: false, error: 'Database unavailable.' }, { status: 500 });
     }
+
+    await db.query(
+      `ALTER TABLE public.products
+       ADD COLUMN IF NOT EXISTS name_i18n JSONB DEFAULT '{}'::jsonb,
+       ADD COLUMN IF NOT EXISTS ingredients_i18n JSONB DEFAULT '{}'::jsonb`
+    );
 
     // Verify actor & role server-side (never trust client-supplied verifiedBy / timestamps)
     let verifiedByName = 'Admin';
@@ -254,6 +262,18 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+    const cleanStringMap = (raw: any): Record<string, string> => {
+      const out: Record<string, string> = {};
+      if (raw && typeof raw === 'object') {
+        for (const [lang, val] of Object.entries(raw)) {
+          const s = String(val || '').trim();
+          if (s) out[lang] = s;
+        }
+      }
+      return out;
+    };
+    const cleanNameI18n = cleanStringMap(nameI18n);
+    const cleanIngredientsI18n = cleanStringMap(ingredientsI18n);
     const cleanCertStatus =
       certificationStatus === 'certified' ||
       certificationStatus === 'not_found' ||
@@ -319,8 +339,10 @@ export async function POST(req: NextRequest) {
              is_certified = $22,
              verified_official = $23,
              certification_details = $24,
+             name_i18n = $25::jsonb,
+             ingredients_i18n = $26::jsonb,
              updated_at = $13::timestamptz
-         WHERE id = $25
+         WHERE id = $27
          RETURNING *`,
         [
           cleanBarcode,
@@ -347,6 +369,8 @@ export async function POST(req: NextRequest) {
           isCert,
           Boolean(verifiedOfficial),
           certificationDetails || '',
+          JSON.stringify(cleanNameI18n),
+          JSON.stringify(cleanIngredientsI18n),
           targetId,
         ]
       );
@@ -359,14 +383,16 @@ export async function POST(req: NextRequest) {
            verified_by, verified_by_id, verified_at, verification_updated_at,
            certifier, certification_status, has_packaging_logo,
            certificate_expires_at, certificate_proof_url, certificate_proof_name,
-           user_alerts, user_alerts_i18n, is_certified, verified_official, certification_details
+           user_alerts, user_alerts_i18n, is_certified, verified_official, certification_details,
+           name_i18n, ingredients_i18n
          ) VALUES (
            $1, $2, $3, $4, $5, $6,
            $7, $8, $9, $10,
            $11, $12, $13::timestamptz, $13::timestamptz,
            $14, $15, $16,
            $17::date, $18, $19,
-           $20::jsonb, $21::jsonb, $22, $23, $24
+           $20::jsonb, $21::jsonb, $22, $23, $24,
+           $25::jsonb, $26::jsonb
          )
          RETURNING *`,
         [
@@ -394,6 +420,8 @@ export async function POST(req: NextRequest) {
           isCert,
           Boolean(verifiedOfficial),
           certificationDetails || '',
+          JSON.stringify(cleanNameI18n),
+          JSON.stringify(cleanIngredientsI18n),
         ]
       );
       savedRow = insertRes.rows[0];

@@ -234,7 +234,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
             }`}
           >
             <Barcode className="w-3.5 h-3.5" />
-            <span>Produits inconnus ({total})</span>
+            <span>Produits inconnus ({isLoading && total === 0 ? '...' : total})</span>
           </button>
           <button
             type="button"

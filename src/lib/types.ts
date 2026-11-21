@@ -4,9 +4,11 @@ export interface Product {
   id: string;
   barcode: string;
   name: string;
+  nameI18n?: Record<string, string>;
   brand: string;
   imageUrl?: string;
   ingredientsRaw: string;
+  ingredientsI18n?: Record<string, string>;
   detectedAdditives: string[];
   aiStatus: HalalStatus;
   manualStatus?: HalalStatus;
