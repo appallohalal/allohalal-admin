@@ -23,6 +23,7 @@ export interface Product {
   certificateProofUrl?: string;
   certificateProofName?: string;
   userAlerts?: string[];
+  userAlertsI18n?: Record<string, string[]>;
   isCertified?: boolean;
   verifiedOfficial?: boolean;
   certificationDetails?: string;

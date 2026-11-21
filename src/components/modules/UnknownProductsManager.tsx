@@ -641,18 +641,6 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
                 />
               </div>
-              <div className="md:col-span-2">
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Notes internes
-                </label>
-                <input
-                  type="text"
-                  value={notesInput}
-                  onChange={(e) => setNotesInput(e.target.value)}
-                  placeholder="Notes de modération..."
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
-                />
-              </div>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">

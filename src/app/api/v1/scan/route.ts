@@ -75,6 +75,10 @@ export async function POST(req: NextRequest) {
           certificateProofUrl: product.certificate_proof_url || null,
           certificateProofName: product.certificate_proof_name || null,
           userAlerts: Array.isArray(product.user_alerts) ? product.user_alerts : [],
+          userAlertsI18n:
+            product.user_alerts_i18n && typeof product.user_alerts_i18n === 'object'
+              ? product.user_alerts_i18n
+              : {},
           verifiedAt: product.verified_at || null,
           verificationUpdatedAt: product.verification_updated_at || null,
           isCertified,

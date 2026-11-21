@@ -56,6 +56,10 @@ export const fetchProducts = async (): Promise<Product[]> => {
         certificateProofUrl: item.certificate_proof_url || undefined,
         certificateProofName: item.certificate_proof_name || undefined,
         userAlerts: Array.isArray(item.user_alerts) ? item.user_alerts : [],
+        userAlertsI18n:
+          item.user_alerts_i18n && typeof item.user_alerts_i18n === 'object'
+            ? item.user_alerts_i18n
+            : {},
         isCertified: item.is_certified === true || Boolean(item.certifier),
         verifiedOfficial: item.verified_official === true,
         certificationDetails: item.certification_details || '',

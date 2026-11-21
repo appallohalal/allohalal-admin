@@ -102,7 +102,9 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const [productCertifier, setProductCertifier] = useState('');
   const [productVerifiedOfficial, setProductVerifiedOfficial] = useState(false);
   const [productCertDetails, setProductCertDetails] = useState('');
-  const [userAlerts, setUserAlerts] = useState<string[]>([]);
+  const [userAlertsI18n, setUserAlertsI18n] = useState<Record<string, string[]>>({ fr: [] });
+  const [activeAlertLang, setActiveAlertLang] = useState<string>('fr');
+  const ALERT_LANGS = ['fr', 'en', 'ar', 'de', 'es', 'it', 'pt', 'ru', 'tr'];
   const [certificationStatus, setCertificationStatus] = useState<'certified' | 'not_found' | 'unknown'>('unknown');
   const [hasPackagingLogo, setHasPackagingLogo] = useState(false);
   const [certificateExpiresAt, setCertificateExpiresAt] = useState('');
@@ -138,7 +140,8 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setProductCertifier('');
     setProductVerifiedOfficial(false);
     setProductCertDetails('');
-    setUserAlerts([]);
+    setUserAlertsI18n({ fr: [] });
+    setActiveAlertLang('fr');
     setCertificationStatus('unknown');
     setHasPackagingLogo(false);
     setCertificateExpiresAt('');
@@ -170,7 +173,18 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setProductCertifier(p.certifier || '');
     setProductVerifiedOfficial(p.verifiedOfficial || false);
     setProductCertDetails(p.certificationDetails || '');
-    setUserAlerts(Array.isArray(p.userAlerts) ? [...p.userAlerts] : []);
+    const baseAlerts = Array.isArray(p.userAlerts) ? [...p.userAlerts] : [];
+    const existingI18n: Record<string, string[]> =
+      p.userAlertsI18n && typeof p.userAlertsI18n === 'object'
+        ? Object.fromEntries(
+            Object.entries(p.userAlertsI18n).map(([k, v]) => [k, Array.isArray(v) ? [...v] : []])
+          )
+        : {};
+    if ((!existingI18n.fr || existingI18n.fr.length === 0) && baseAlerts.length > 0) {
+      existingI18n.fr = baseAlerts;
+    }
+    setUserAlertsI18n(existingI18n);
+    setActiveAlertLang('fr');
     setCertificationStatus(
       p.certificationStatus || (p.isCertified || p.certifier ? 'certified' : 'unknown')
     );
@@ -244,7 +258,12 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
       .map((s) => s.trim().toUpperCase())
       .filter(Boolean);
 
-    const cleanAlerts = userAlerts.map((a) => a.trim()).filter(Boolean);
+    const cleanedI18n: Record<string, string[]> = {};
+    for (const [lang, arr] of Object.entries(userAlertsI18n)) {
+      const filteredArr = (arr || []).map((a) => a.trim()).filter(Boolean);
+      if (filteredArr.length > 0) cleanedI18n[lang] = filteredArr;
+    }
+    const cleanAlerts = cleanedI18n.fr || cleanedI18n.en || Object.values(cleanedI18n)[0] || [];
     const effectiveCertStatus =
       certificationStatus === 'certified' || productCertifier.trim()
         ? certificationStatus === 'not_found'
@@ -263,8 +282,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
       aiStatus: fullEditProduct ? fullEditProduct.aiStatus : productStatus,
       manualStatus: productStatus,
       isOverridden: true,
-      moderatorNote:
-        productNote.trim() || `Verified as ${productStatus} by ${currentAdminName}`,
+      moderatorNote: '',
       verifiedBy: currentAdminName,
       certifier: effectiveCertStatus === 'certified' ? productCertifier.trim() || undefined : undefined,
       certificationStatus: effectiveCertStatus,
@@ -273,6 +291,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
       certificateProofUrl: certificateProofUrl.trim() || undefined,
       certificateProofName: certificateProofName.trim() || undefined,
       userAlerts: cleanAlerts,
+      userAlertsI18n: cleanedI18n,
       isCertified: effectiveCertStatus === 'certified' || Boolean(productCertifier.trim()),
       verifiedOfficial: productVerifiedOfficial,
       certificationDetails: productCertDetails.trim() || undefined,
@@ -995,19 +1014,38 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 </div>
               </div>
 
-              {/* 2.1 User-Facing Alerts (Alertes affichées sur utilisateur) */}
+              {/* 2.1 User-Facing Alerts (Multi-language: Alertes affichées sur utilisateur) */}
               <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-2.5">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4 text-amber-500" />
                     <span>Alertes affichées sur utilisateur</span>
                   </label>
-                  <span className="text-[10px] font-semibold text-slate-400">
-                    {userAlerts.length} alerte(s)
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {ALERT_LANGS.map((lang) => {
+                      const count = (userAlertsI18n[lang] || []).filter((x) => x.trim()).length;
+                      return (
+                        <button
+                          key={lang}
+                          type="button"
+                          onClick={() => setActiveAlertLang(lang)}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase border transition-all cursor-pointer ${
+                            activeAlertLang === lang
+                              ? 'bg-slate-900 text-white border-slate-900'
+                              : count > 0
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          {lang}
+                          {count > 0 ? ` (${count})` : ''}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {userAlerts.map((alertText, idx) => (
+                {(userAlertsI18n[activeAlertLang] || []).map((alertText, idx) => (
                   <div
                     key={idx}
                     className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs"
@@ -1017,16 +1055,19 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                       type="text"
                       value={alertText}
                       onChange={(e) => {
-                        const next = [...userAlerts];
-                        next[idx] = e.target.value;
-                        setUserAlerts(next);
+                        const curr = [...(userAlertsI18n[activeAlertLang] || [])];
+                        curr[idx] = e.target.value;
+                        setUserAlertsI18n({ ...userAlertsI18n, [activeAlertLang]: curr });
                       }}
-                      placeholder="ex. Allergènes en présence / E525 : origines à confirmer"
+                      placeholder={`[${activeAlertLang.toUpperCase()}] ex. Allergènes en présence / E525 : origines à confirmer`}
                       className="flex-1 bg-transparent text-xs text-slate-900 focus:outline-none py-1 placeholder:text-slate-400"
                     />
                     <button
                       type="button"
-                      onClick={() => setUserAlerts(userAlerts.filter((_, i) => i !== idx))}
+                      onClick={() => {
+                        const curr = (userAlertsI18n[activeAlertLang] || []).filter((_, i) => i !== idx);
+                        setUserAlertsI18n({ ...userAlertsI18n, [activeAlertLang]: curr });
+                      }}
                       className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                       title="Supprimer cette alerte"
                     >
@@ -1037,27 +1078,15 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setUserAlerts([...userAlerts, ''])}
+                  onClick={() => {
+                    const curr = [...(userAlertsI18n[activeAlertLang] || []), ''];
+                    setUserAlertsI18n({ ...userAlertsI18n, [activeAlertLang]: curr });
+                  }}
                   className="w-full py-2 px-3 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Ajouter un motif</span>
+                  <span>Ajouter un motif ({activeAlertLang.toUpperCase()})</span>
                 </button>
-              </div>
-
-              {/* Verification Note */}
-              <div>
-                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Note de vérification (Optionnel)</span>
-                </label>
-                <input
-                  type="text"
-                  value={productNote}
-                  onChange={(e) => setProductNote(e.target.value)}
-                  placeholder="ex. Certifié 100% Halal par AVS / ingrédients végétaux vérifiés"
-                  className={inputCls}
-                />
               </div>
 
               {/* 2.2 Halal Certification Block (Certification halal) */}
