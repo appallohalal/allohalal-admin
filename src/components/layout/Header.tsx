@@ -23,6 +23,10 @@ const TAB_TITLES: Record<NavTab, { title: string; desc: string }> = {
     title: 'Products',
     desc: 'Catalog and review',
   },
+  unknown_products: {
+    title: 'Produits inconnus',
+    desc: 'Codes-barres inconnus, photos et signalements',
+  },
   contributions: {
     title: 'Contributions',
     desc: 'Community donations, free-will contributions, and financial support',

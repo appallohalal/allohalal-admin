@@ -13,13 +13,75 @@ export interface Product {
   isOverridden: boolean;
   moderatorNote?: string;
   verifiedBy?: string;
+  verifiedById?: string;
+  verifiedAt?: string;
+  verificationUpdatedAt?: string;
   certifier?: string;
+  certificationStatus?: 'certified' | 'not_found' | 'unknown';
+  hasPackagingLogo?: boolean;
+  certificateExpiresAt?: string;
+  certificateProofUrl?: string;
+  certificateProofName?: string;
+  userAlerts?: string[];
   isCertified?: boolean;
   verifiedOfficial?: boolean;
   certificationDetails?: string;
   scansCount: number;
   lastScannedAt: string;
   createdAt: string;
+}
+
+export type UnknownProductStatus = 'nouveau' | 'en_cours' | 'traite' | 'rejete';
+
+export interface UnknownProductSubmission {
+  id: string;
+  unknownProductId: string;
+  barcode: string;
+  userId?: string;
+  userEmail?: string;
+  deviceId?: string;
+  fcmToken?: string;
+  notifyWhenReady: boolean;
+  notifiedAt?: string;
+  frontImageUrl?: string;
+  ingredientsImageUrl?: string;
+  certifierImageUrl?: string;
+  createdAt: string;
+}
+
+export interface UnknownProduct {
+  id: string;
+  barcode: string;
+  status: UnknownProductStatus;
+  scansCount: number;
+  submissionsCount: number;
+  frontImageUrl?: string;
+  ingredientsImageUrl?: string;
+  certifierImageUrl?: string;
+  linkedProductId?: string;
+  notes?: string;
+  firstScannedAt: string;
+  lastScannedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  submissions?: UnknownProductSubmission[];
+}
+
+export interface ProductErrorReport {
+  id: string;
+  barcode: string;
+  productId?: string;
+  productName?: string;
+  reportType: 'ingredients' | 'certifier' | 'status' | 'other';
+  message: string;
+  userId?: string;
+  userEmail?: string;
+  deviceId?: string;
+  status: 'nouveau' | 'traite' | 'rejete';
+  adminNote?: string;
+  reviewedBy?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AdditiveTranslation {

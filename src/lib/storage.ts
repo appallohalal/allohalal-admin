@@ -1,6 +1,6 @@
 'use client';
 
-import { Product, Additive, UserAccount, GeoAd, PartnerCategory, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, PushNotification, NotificationSettings, CmsSettings, CmsTexts, Contribution, DonationStatus, DonationTier } from './types';
+import { Product, Additive, UserAccount, GeoAd, PartnerCategory, GroqApiLog, HalalStatus, AdMobSettings, GroqSettings, AuthSettings, PushNotification, NotificationSettings, CmsSettings, CmsTexts, Contribution, DonationStatus, DonationTier, UnknownProduct, UnknownProductStatus, ProductErrorReport } from './types';
 import { supabase } from './supabase';
 
 const STORAGE_KEYS = {
@@ -44,7 +44,18 @@ export const fetchProducts = async (): Promise<Product[]> => {
         isOverridden: item.is_overridden || false,
         moderatorNote: item.moderator_note,
         verifiedBy: item.verified_by,
+        verifiedById: item.verified_by_id,
+        verifiedAt: item.verified_at,
+        verificationUpdatedAt: item.verification_updated_at,
         certifier: item.certifier || '',
+        certificationStatus:
+          item.certification_status ||
+          (item.is_certified === true || Boolean(item.certifier) ? 'certified' : 'unknown'),
+        hasPackagingLogo: item.has_packaging_logo === true,
+        certificateExpiresAt: item.certificate_expires_at || undefined,
+        certificateProofUrl: item.certificate_proof_url || undefined,
+        certificateProofName: item.certificate_proof_name || undefined,
+        userAlerts: Array.isArray(item.user_alerts) ? item.user_alerts : [],
         isCertified: item.is_certified === true || Boolean(item.certifier),
         verifiedOfficial: item.verified_official === true,
         certificationDetails: item.certification_details || '',
@@ -108,50 +119,172 @@ export const updateProductStatus = async (
   return fetchProducts();
 };
 
-export const saveProduct = async (product: Product): Promise<Product[]> => {
+export const saveProduct = async (
+  product: Product,
+  options?: { actorId?: string; unknownProductId?: string }
+): Promise<Product[]> => {
   try {
-    const payload: Record<string, any> = {
-      barcode: product.barcode,
-      name: product.name,
-      brand: product.brand || '',
-      image_url: product.imageUrl || null,
-      ingredients_raw: product.ingredientsRaw || '',
-      detected_additives: product.detectedAdditives || [],
-      ai_status: product.aiStatus || 'HALAL',
-      manual_status: product.manualStatus || product.aiStatus || 'HALAL',
-      is_overridden: product.isOverridden ?? true,
-      moderator_note: product.moderatorNote || '',
-      verified_by: product.verifiedBy || 'Admin',
-      certifier: product.certifier ? product.certifier.trim() : null,
-      is_certified: product.isCertified ?? Boolean(product.certifier?.trim()),
-      verified_official: product.verifiedOfficial ?? false,
-      certification_details: product.certificationDetails || '',
-      scans_count: product.scansCount || 0,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (product.id && !product.id.startsWith('prod-')) {
-      payload.id = product.id;
-      await supabase.from('products').upsert(payload);
-    } else {
-      // Check if a product with this barcode already exists
-      const { data: existing } = await supabase
-        .from('products')
-        .select('id')
-        .eq('barcode', product.barcode)
-        .maybeSingle();
-
-      if (existing?.id) {
-        await supabase.from('products').update(payload).eq('id', existing.id);
-      } else {
-        await supabase.from('products').insert(payload);
-      }
+    const res = await fetch('/api/v1/products/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...product,
+        actorId: options?.actorId,
+        unknownProductId: options?.unknownProductId,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to save product.');
     }
   } catch (err) {
     console.warn('Supabase save product note:', err);
+    throw err;
   }
 
   return fetchProducts();
+};
+
+export const uploadProductFile = async (
+  file: File,
+  folder: 'proofs' | 'unknown-products',
+  barcode?: string
+): Promise<{ url: string; fileName: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('folder', folder);
+  if (barcode) formData.append('barcode', barcode);
+
+  const res = await fetch('/api/v1/upload', {
+    method: 'POST',
+    body: formData,
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'File upload failed.');
+  }
+  return { url: data.url, fileName: data.fileName || file.name };
+};
+
+export const fetchUnknownProducts = async (params?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{ items: UnknownProduct[]; total: number }> => {
+  try {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set('status', params.status);
+    if (params?.search) qs.set('search', params.search);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
+
+    const res = await fetch(`/api/v1/unknown-products?${qs.toString()}`);
+    const data = await res.json();
+    if (!res.ok || !data.success) return { items: [], total: 0 };
+
+    const mapped: UnknownProduct[] = (data.items || []).map((row: any) => ({
+      id: row.id,
+      barcode: row.barcode,
+      status: row.status || 'nouveau',
+      scansCount: row.scans_count || 1,
+      submissionsCount: row.submissions_count || 0,
+      frontImageUrl: row.front_image_url || undefined,
+      ingredientsImageUrl: row.ingredients_image_url || undefined,
+      certifierImageUrl: row.certifier_image_url || undefined,
+      linkedProductId: row.linked_product_id || undefined,
+      notes: row.notes || undefined,
+      firstScannedAt: row.first_scanned_at,
+      lastScannedAt: row.last_scanned_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      submissions: Array.isArray(row.submissions)
+        ? row.submissions.map((s: any) => ({
+            id: s.id,
+            unknownProductId: s.unknown_product_id,
+            barcode: s.barcode,
+            userId: s.user_id || undefined,
+            userEmail: s.user_email || undefined,
+            deviceId: s.device_id || undefined,
+            fcmToken: s.fcm_token || undefined,
+            notifyWhenReady: Boolean(s.notify_when_ready),
+            notifiedAt: s.notified_at || undefined,
+            frontImageUrl: s.front_image_url || undefined,
+            ingredientsImageUrl: s.ingredients_image_url || undefined,
+            certifierImageUrl: s.certifier_image_url || undefined,
+            createdAt: s.created_at,
+          }))
+        : [],
+    }));
+    return { items: mapped, total: data.total || mapped.length };
+  } catch (err) {
+    console.warn('fetchUnknownProducts warning:', err);
+    return { items: [], total: 0 };
+  }
+};
+
+export const updateUnknownProduct = async (payload: {
+  id: string;
+  status?: UnknownProductStatus;
+  notes?: string;
+  linkedProductId?: string;
+}): Promise<boolean> => {
+  const res = await fetch('/api/v1/unknown-products', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  return Boolean(res.ok && data.success);
+};
+
+export const deleteUnknownProduct = async (id: string): Promise<boolean> => {
+  const res = await fetch(`/api/v1/unknown-products?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  const data = await res.json();
+  return Boolean(res.ok && data.success);
+};
+
+export const fetchErrorReports = async (): Promise<ProductErrorReport[]> => {
+  try {
+    const res = await fetch('/api/v1/error-reports');
+    const data = await res.json();
+    if (!res.ok || !data.success) return [];
+    return (data.reports || []).map((r: any) => ({
+      id: r.id,
+      barcode: r.barcode,
+      productId: r.product_id || undefined,
+      productName: r.product_name || undefined,
+      reportType: r.report_type || 'other',
+      message: r.message,
+      userId: r.user_id || undefined,
+      userEmail: r.user_email || undefined,
+      deviceId: r.device_id || undefined,
+      status: r.status || 'nouveau',
+      adminNote: r.admin_note || undefined,
+      reviewedBy: r.reviewed_by || undefined,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+    }));
+  } catch {
+    return [];
+  }
+};
+
+export const updateErrorReport = async (payload: {
+  id: string;
+  status?: 'nouveau' | 'traite' | 'rejete';
+  adminNote?: string;
+  reviewedBy?: string;
+}): Promise<boolean> => {
+  const res = await fetch('/api/v1/error-reports', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  return Boolean(res.ok && data.success);
 };
 
 export const deleteProduct = async (productId: string): Promise<Product[]> => {

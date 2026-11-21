@@ -15,13 +15,14 @@ import {
   Bell,
   FileText,
   HeartHandshake,
+  HelpCircle,
 } from 'lucide-react';
 
 import { APP_COLORS } from '@/lib/colors';
 import { AdminUser } from '@/lib/auth';
 import { canAccessTab } from '@/lib/permissions';
 
-export type NavTab = 'dashboard' | 'products' | 'contributions' | 'additives' | 'cms' | 'users' | 'admins' | 'security' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
+export type NavTab = 'dashboard' | 'products' | 'unknown_products' | 'contributions' | 'additives' | 'cms' | 'users' | 'admins' | 'security' | 'ads' | 'admob' | 'notifications' | 'analytics' | 'logs';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -51,6 +52,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, curren
       icon: PackageSearch,
       badge: counts?.pendingReviews,
       badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+    },
+    {
+      id: 'unknown_products' as NavTab,
+      label: 'Produits inconnus',
+      sublabel: 'Scans & Signalements',
+      icon: HelpCircle,
     },
     {
       id: 'contributions' as NavTab,

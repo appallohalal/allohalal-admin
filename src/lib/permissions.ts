@@ -14,6 +14,10 @@ export interface RolePermissions {
   canOverrideProduct: boolean;
   canDeleteProduct: boolean;
   canExportCSV: boolean;
+  // Unknown products & error reports
+  canViewUnknownProducts: boolean;
+  canManageUnknownProducts: boolean;
+  canDeleteUnknownProducts: boolean;
   // Dictionaries / Additives permissions
   canViewAdditives: boolean;
   canAddAdditive: boolean;
@@ -34,6 +38,7 @@ const ROLE_PERMISSIONS_MAP: Record<AdminRole, RolePermissions> = {
     allowedTabs: [
       'dashboard',
       'products',
+      'unknown_products',
       'contributions',
       'additives',
       'cms',
@@ -53,6 +58,9 @@ const ROLE_PERMISSIONS_MAP: Record<AdminRole, RolePermissions> = {
     canOverrideProduct: true,
     canDeleteProduct: true,
     canExportCSV: true,
+    canViewUnknownProducts: true,
+    canManageUnknownProducts: true,
+    canDeleteUnknownProducts: true,
     canViewAdditives: true,
     canAddAdditive: true,
     canEditAdditive: true,
@@ -66,7 +74,7 @@ const ROLE_PERMISSIONS_MAP: Record<AdminRole, RolePermissions> = {
 
   'Chief Auditor': {
     role: 'Chief Auditor',
-    allowedTabs: ['dashboard', 'products', 'additives'],
+    allowedTabs: ['dashboard', 'products', 'unknown_products', 'additives'],
     defaultTab: 'products',
     canViewProducts: true,
     canAddProduct: true,
@@ -74,6 +82,9 @@ const ROLE_PERMISSIONS_MAP: Record<AdminRole, RolePermissions> = {
     canOverrideProduct: true,
     canDeleteProduct: true,
     canExportCSV: true,
+    canViewUnknownProducts: true,
+    canManageUnknownProducts: true,
+    canDeleteUnknownProducts: true,
     canViewAdditives: true,
     canAddAdditive: true,
     canEditAdditive: true,
@@ -87,7 +98,7 @@ const ROLE_PERMISSIONS_MAP: Record<AdminRole, RolePermissions> = {
 
   'Halal Auditor': {
     role: 'Halal Auditor',
-    allowedTabs: ['dashboard', 'products', 'additives'],
+    allowedTabs: ['dashboard', 'products', 'unknown_products', 'additives'],
     defaultTab: 'products',
     canViewProducts: true,
     canAddProduct: true,
@@ -95,6 +106,9 @@ const ROLE_PERMISSIONS_MAP: Record<AdminRole, RolePermissions> = {
     canOverrideProduct: false,
     canDeleteProduct: false,
     canExportCSV: false,
+    canViewUnknownProducts: true,
+    canManageUnknownProducts: true,
+    canDeleteUnknownProducts: false,
     canViewAdditives: true,
     canAddAdditive: true,
     canEditAdditive: false,
@@ -126,6 +140,9 @@ const ROLE_PERMISSIONS_MAP: Record<AdminRole, RolePermissions> = {
     canOverrideProduct: false,
     canDeleteProduct: false,
     canExportCSV: false,
+    canViewUnknownProducts: false,
+    canManageUnknownProducts: false,
+    canDeleteUnknownProducts: false,
     canViewAdditives: false,
     canAddAdditive: false,
     canEditAdditive: false,

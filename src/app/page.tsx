@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar, NavTab } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DashboardOverview } from '@/components/modules/DashboardOverview';
-import { ProductCatalog } from '@/components/modules/ProductCatalog';
+import { ProductCatalog, ProductPrefillData } from '@/components/modules/ProductCatalog';
+import { UnknownProductsManager } from '@/components/modules/UnknownProductsManager';
 import { ContributionsManager } from '@/components/modules/ContributionsManager';
 import { AdditivesDictionary } from '@/components/modules/AdditivesDictionary';
 import { UserManagement } from '@/components/modules/UserManagement';
@@ -67,6 +68,7 @@ import { ToastContainer } from '@/components/ui/ToastContainer';
 const VALID_TABS: NavTab[] = [
   'dashboard',
   'products',
+  'unknown_products',
   'contributions',
   'additives',
   'cms',
@@ -99,6 +101,7 @@ export default function AdminDashboardPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [is2FAModalOpen, setIs2FAModalOpen] = useState(false);
   const [isFirstUser, setIsFirstUser] = useState<boolean | null>(null);
+  const [productPrefill, setProductPrefill] = useState<ProductPrefillData | null>(null);
 
   // Restore and sync active tab from URL hash and localStorage
   useEffect(() => {
@@ -245,7 +248,7 @@ export default function AdminDashboardPage() {
     setProducts(updated);
   };
 
-  const handleSaveProduct = async (product: Product) => {
+  const handleSaveProduct = async (product: Product, unknownProductId?: string) => {
     const perms = getRolePermissions(currentUser?.role);
     const isExisting = Boolean(product.id && !product.id.startsWith('prod-'));
     if (isExisting && !perms.canEditProduct) {
@@ -256,7 +259,10 @@ export default function AdminDashboardPage() {
       toast.error('Your role cannot add products.', 'Permission Denied');
       return;
     }
-    const updated = await saveProduct(product);
+    const updated = await saveProduct(product, {
+      actorId: currentUser?.id,
+      unknownProductId,
+    });
     setProducts(updated);
   };
 
@@ -485,6 +491,21 @@ export default function AdminDashboardPage() {
                 currentAdminName={currentUser?.name}
                 currentUserRole={currentUser?.role}
                 searchQuery={searchQuery}
+                prefillData={productPrefill}
+                onClearPrefill={() => setProductPrefill(null)}
+              />
+            )}
+
+            {activeTab === 'unknown_products' && canAccessTab(currentUser?.role, 'unknown_products') && (
+              <UnknownProductsManager
+                products={products}
+                currentUserRole={currentUser?.role}
+                currentAdminName={currentUser?.name}
+                searchQuery={searchQuery}
+                onCreateProductFromUnknown={(prefill) => {
+                  setProductPrefill(prefill);
+                  handleTabChange('products');
+                }}
               />
             )}
 

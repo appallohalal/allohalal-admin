@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Product, HalalStatus } from '@/lib/types';
 import { APP_COLORS } from '@/lib/colors';
 import { toast } from '@/lib/toast';
 import { KNOWN_CERTIFIERS } from '@/lib/certifiers';
+import { uploadProductFile } from '@/lib/storage';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -29,9 +30,23 @@ import {
   ShieldCheck,
   Award,
   Download,
+  Eye,
+  Upload,
+  Calendar,
+  ExternalLink,
+  AlertCircle,
 } from 'lucide-react';
 
 import { getRolePermissions } from '@/lib/permissions';
+
+export interface ProductPrefillData {
+  barcode?: string;
+  name?: string;
+  brand?: string;
+  imageUrl?: string;
+  ingredientsRaw?: string;
+  unknownProductId?: string;
+}
 
 interface ProductCatalogProps {
   products: Product[];
@@ -43,11 +58,13 @@ interface ProductCatalogProps {
     certifier?: string,
     verifiedOfficial?: boolean
   ) => void;
-  onSaveProduct?: (product: Product) => Promise<void> | void;
+  onSaveProduct?: (product: Product, unknownProductId?: string) => Promise<void> | void;
   onDeleteProduct?: (productId: string) => Promise<void> | void;
   currentAdminName?: string;
   currentUserRole?: string;
   searchQuery: string;
+  prefillData?: ProductPrefillData | null;
+  onClearPrefill?: () => void;
 }
 
 export const ProductCatalog: React.FC<ProductCatalogProps> = ({
@@ -58,6 +75,8 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   currentAdminName = 'Senior Halal Auditor',
   currentUserRole = 'Super Admin',
   searchQuery,
+  prefillData,
+  onClearPrefill,
 }) => {
   const perms = getRolePermissions(currentUserRole);
   const [statusFilter, setStatusFilter] = useState<'ALL' | HalalStatus | 'OVERRIDDEN'>('ALL');
@@ -83,6 +102,16 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const [productCertifier, setProductCertifier] = useState('');
   const [productVerifiedOfficial, setProductVerifiedOfficial] = useState(false);
   const [productCertDetails, setProductCertDetails] = useState('');
+  const [userAlerts, setUserAlerts] = useState<string[]>([]);
+  const [certificationStatus, setCertificationStatus] = useState<'certified' | 'not_found' | 'unknown'>('unknown');
+  const [hasPackagingLogo, setHasPackagingLogo] = useState(false);
+  const [certificateExpiresAt, setCertificateExpiresAt] = useState('');
+  const [certificateProofUrl, setCertificateProofUrl] = useState('');
+  const [certificateProofName, setCertificateProofName] = useState('');
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+  const [isProofModalOpen, setIsProofModalOpen] = useState(false);
+  const [activeUnknownProductId, setActiveUnknownProductId] = useState<string | undefined>(undefined);
+  const proofInputRef = useRef<HTMLInputElement | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Quick Override Modal State
@@ -95,13 +124,13 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const c = APP_COLORS.classes;
   const inputCls = `w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none ${c.primaryFocus} focus:bg-white transition-all placeholder:text-slate-400`;
 
-  const openCreateModal = () => {
+  const openCreateModal = (prefill?: ProductPrefillData) => {
     setFullEditProduct(null);
-    setBarcode('');
-    setName('');
-    setBrand('');
-    setImageUrl('');
-    setIngredientsRaw('');
+    setBarcode(prefill?.barcode || '');
+    setName(prefill?.name || '');
+    setBrand(prefill?.brand || '');
+    setImageUrl(prefill?.imageUrl || '');
+    setIngredientsRaw(prefill?.ingredientsRaw || '');
     setAdditivesInput('');
     setProductStatus('HALAL');
     setProductNote('Manually verified and added by Halal Auditor');
@@ -109,8 +138,23 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setProductCertifier('');
     setProductVerifiedOfficial(false);
     setProductCertDetails('');
+    setUserAlerts([]);
+    setCertificationStatus('unknown');
+    setHasPackagingLogo(false);
+    setCertificateExpiresAt('');
+    setCertificateProofUrl('');
+    setCertificateProofName('');
+    setActiveUnknownProductId(prefill?.unknownProductId);
     setIsProductModalOpen(true);
   };
+
+  useEffect(() => {
+    if (prefillData) {
+      openCreateModal(prefillData);
+      onClearPrefill?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillData]);
 
   const openFullEditModal = (p: Product) => {
     setFullEditProduct(p);
@@ -126,7 +170,35 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     setProductCertifier(p.certifier || '');
     setProductVerifiedOfficial(p.verifiedOfficial || false);
     setProductCertDetails(p.certificationDetails || '');
+    setUserAlerts(Array.isArray(p.userAlerts) ? [...p.userAlerts] : []);
+    setCertificationStatus(
+      p.certificationStatus || (p.isCertified || p.certifier ? 'certified' : 'unknown')
+    );
+    setHasPackagingLogo(Boolean(p.hasPackagingLogo));
+    setCertificateExpiresAt(
+      p.certificateExpiresAt ? String(p.certificateExpiresAt).slice(0, 10) : ''
+    );
+    setCertificateProofUrl(p.certificateProofUrl || '');
+    setCertificateProofName(p.certificateProofName || '');
+    setActiveUnknownProductId(undefined);
     setIsProductModalOpen(true);
+  };
+
+  const handleProofFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingProof(true);
+    try {
+      const uploaded = await uploadProductFile(file, 'proofs', barcode.trim() || 'product');
+      setCertificateProofUrl(uploaded.url);
+      setCertificateProofName(uploaded.fileName);
+      toast.success('Document de preuve téléversé avec succès.', 'Preuve ajoutée');
+    } catch (err: any) {
+      toast.error(err?.message || 'Échec du téléversement de la preuve.', 'Erreur Upload');
+    } finally {
+      setIsUploadingProof(false);
+      if (proofInputRef.current) proofInputRef.current.value = '';
+    }
   };
 
   const openOverrideModal = (p: Product) => {
@@ -172,6 +244,14 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
       .map((s) => s.trim().toUpperCase())
       .filter(Boolean);
 
+    const cleanAlerts = userAlerts.map((a) => a.trim()).filter(Boolean);
+    const effectiveCertStatus =
+      certificationStatus === 'certified' || productCertifier.trim()
+        ? certificationStatus === 'not_found'
+          ? 'not_found'
+          : 'certified'
+        : certificationStatus;
+
     const newProduct: Product = {
       id: fullEditProduct ? fullEditProduct.id : `prod-${Date.now()}`,
       barcode: cleanBarcode,
@@ -184,10 +264,16 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
       manualStatus: productStatus,
       isOverridden: true,
       moderatorNote:
-        productNote.trim() || `Verified as ${productStatus} by ${productVerifiedBy.trim()}`,
-      verifiedBy: productVerifiedBy.trim() || currentAdminName,
-      certifier: productCertifier.trim() || undefined,
-      isCertified: Boolean(productCertifier.trim()),
+        productNote.trim() || `Verified as ${productStatus} by ${currentAdminName}`,
+      verifiedBy: currentAdminName,
+      certifier: effectiveCertStatus === 'certified' ? productCertifier.trim() || undefined : undefined,
+      certificationStatus: effectiveCertStatus,
+      hasPackagingLogo,
+      certificateExpiresAt: certificateExpiresAt.trim() || undefined,
+      certificateProofUrl: certificateProofUrl.trim() || undefined,
+      certificateProofName: certificateProofName.trim() || undefined,
+      userAlerts: cleanAlerts,
+      isCertified: effectiveCertStatus === 'certified' || Boolean(productCertifier.trim()),
       verifiedOfficial: productVerifiedOfficial,
       certificationDetails: productCertDetails.trim() || undefined,
       scansCount: fullEditProduct ? fullEditProduct.scansCount : 0,
@@ -197,7 +283,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onSaveProduct(newProduct);
+      await onSaveProduct(newProduct, activeUnknownProductId);
       toast.success(
         fullEditProduct
           ? `Product "${cleanName}" updated successfully.`
@@ -205,6 +291,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
         fullEditProduct ? 'Product Updated' : 'Product Added'
       );
       setIsProductModalOpen(false);
+      setActiveUnknownProductId(undefined);
     } catch (err: any) {
       toast.error(err.message || 'Failed to save product.', 'Save Error');
     } finally {
@@ -419,7 +506,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
           {perms.canAddProduct && onSaveProduct && (
             <button
               type="button"
-              onClick={openCreateModal}
+              onClick={() => openCreateModal()}
               className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-2 transition-all cursor-pointer active:scale-98 ${c.primaryBg} ${c.primaryBgHover}`}
             >
               <Plus className="w-4 h-4" />
@@ -567,7 +654,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                     {perms.canAddProduct && onSaveProduct && (
                       <button
                         type="button"
-                        onClick={openCreateModal}
+                        onClick={() => openCreateModal()}
                         className={`mt-4 px-4 py-2 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5 cursor-pointer ${c.primaryBg} ${c.primaryBgHover}`}
                       >
                         <Plus className="w-4 h-4" />
@@ -877,7 +964,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                     }`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    <span>HALAL</span>
+                    <span>Halal</span>
                   </button>
 
                   <button
@@ -890,7 +977,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                     }`}
                   >
                     <AlertTriangle className="w-4 h-4" />
-                    <span>MUSHBOOH</span>
+                    <span>Douteux</span>
                   </button>
 
                   <button
@@ -903,85 +990,131 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                     }`}
                   >
                     <ShieldAlert className="w-4 h-4" />
-                    <span>HARAM</span>
+                    <span>Haram</span>
                   </button>
                 </div>
               </div>
 
-              {/* Auditor Note & Verified By */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Verification Note</span>
+              {/* 2.1 User-Facing Alerts (Alertes affichées sur utilisateur) */}
+              <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-500" />
+                    <span>Alertes affichées sur utilisateur</span>
                   </label>
-                  <input
-                    type="text"
-                    value={productNote}
-                    onChange={(e) => setProductNote(e.target.value)}
-                    placeholder="e.g. Certified 100% Halal by BSTI / JAKIM"
-                    className={inputCls}
-                  />
+                  <span className="text-[10px] font-semibold text-slate-400">
+                    {userAlerts.length} alerte(s)
+                  </span>
                 </div>
 
-                <div>
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
-                    <UserCheck className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Verified By</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={productVerifiedBy}
-                    onChange={(e) => setProductVerifiedBy(e.target.value)}
-                    placeholder="Senior Halal Auditor"
-                    className={inputCls}
-                    required
-                  />
-                </div>
+                {userAlerts.map((alertText, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 shadow-2xs"
+                  >
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                    <input
+                      type="text"
+                      value={alertText}
+                      onChange={(e) => {
+                        const next = [...userAlerts];
+                        next[idx] = e.target.value;
+                        setUserAlerts(next);
+                      }}
+                      placeholder="ex. Allergènes en présence / E525 : origines à confirmer"
+                      className="flex-1 bg-transparent text-xs text-slate-900 focus:outline-none py-1 placeholder:text-slate-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setUserAlerts(userAlerts.filter((_, i) => i !== idx))}
+                      className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                      title="Supprimer cette alerte"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setUserAlerts([...userAlerts, ''])}
+                  className="w-full py-2 px-3 rounded-xl border border-dashed border-slate-300 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Ajouter un motif</span>
+                </button>
               </div>
 
-              {/* Halal Certification & Official Verification */}
-              <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Award className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-bold text-slate-800">
-                      Organisme de Certification Halal
-                    </span>
-                  </div>
+              {/* Verification Note */}
+              <div>
+                <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Note de vérification (Optionnel)</span>
+                </label>
+                <input
+                  type="text"
+                  value={productNote}
+                  onChange={(e) => setProductNote(e.target.value)}
+                  placeholder="ex. Certifié 100% Halal par AVS / ingrédients végétaux vérifiés"
+                  className={inputCls}
+                />
+              </div>
 
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={productVerifiedOfficial}
-                      onChange={(e) => setProductVerifiedOfficial(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
-                    />
-                    <span className="text-xs font-bold text-blue-700 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-                      Vérification Officielle Allo Halal
-                    </span>
-                  </label>
+              {/* 2.2 Halal Certification Block (Certification halal) */}
+              <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3.5">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900">
+                    Certification halal
+                  </span>
                 </div>
 
-                <div>
-                  <input
-                    type="text"
-                    value={productCertifier}
-                    onChange={(e) => setProductCertifier(e.target.value)}
-                    placeholder="ex. AVS, Achahada, Grande Mosquée de Paris, ARGML..."
-                    className={inputCls}
-                  />
-                  <div className="flex flex-wrap gap-1.5 mt-2">
+                {/* A. Certification Status */}
+                <div className="grid grid-cols-3 gap-2.5">
+                  {(
+                    [
+                      { id: 'certified', label: 'Certifié' },
+                      { id: 'not_found', label: 'Non trouvé' },
+                      { id: 'unknown', label: 'Inconnu' },
+                    ] as const
+                  ).map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => {
+                        setCertificationStatus(st.id);
+                        if (st.id !== 'certified') {
+                          setProductCertifier('');
+                        }
+                      }}
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                        certificationStatus === st.id
+                          ? st.id === 'certified'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-slate-800 text-white border-slate-800 shadow-xs'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      {st.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* B. Quick Certifier Selection + Packaging Logo Toggle */}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {KNOWN_CERTIFIERS.slice(0, 7).map((cert) => (
                       <button
                         key={cert.id}
                         type="button"
-                        onClick={() => setProductCertifier(cert.shortName)}
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
-                          productCertifier === cert.shortName
+                        onClick={() => {
+                          setCertificationStatus('certified');
+                          setProductCertifier(cert.shortName);
+                        }}
+                        className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                          productCertifier === cert.shortName && certificationStatus === 'certified'
                             ? 'bg-emerald-600 text-white border-emerald-600'
-                            : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
                         }`}
                       >
                         {cert.shortName}
@@ -991,30 +1124,141 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                       <button
                         type="button"
                         onClick={() => setProductCertifier('')}
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 cursor-pointer"
+                        className="text-[11px] font-bold px-2 py-1 rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 cursor-pointer"
                       >
                         ✕ Effacer
                       </button>
                     )}
                   </div>
+
+                  {certificationStatus === 'certified' && (
+                    <input
+                      type="text"
+                      value={productCertifier}
+                      onChange={(e) => setProductCertifier(e.target.value)}
+                      placeholder="ex. AVS, Achahada, ARGML, Grande Mosquée de Paris..."
+                      className={inputCls}
+                    />
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setHasPackagingLogo(!hasPackagingLogo)}
+                    className={`inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                      hasPackagingLogo
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <CheckCircle2
+                      className={`w-3.5 h-3.5 ${
+                        hasPackagingLogo ? 'text-emerald-600' : 'text-slate-400'
+                      }`}
+                    />
+                    <span>Logo présent sur l&apos;emballage</span>
+                  </button>
                 </div>
+
+                {/* C. Certificate Expiration Date & D. Certificate Proof Management */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="relative">
+                    <label className="text-[11px] font-bold text-slate-600 flex items-center gap-1 mb-1">
+                      <Calendar className="w-3 h-3 text-slate-400" />
+                      <span>Expiration du certificat</span>
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="date"
+                        value={certificateExpiresAt}
+                        onChange={(e) => setCertificateExpiresAt(e.target.value)}
+                        className={inputCls}
+                      />
+                      {certificateExpiresAt && (
+                        <button
+                          type="button"
+                          onClick={() => setCertificateExpiresAt('')}
+                          className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          title="Effacer la date"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    {certificateExpiresAt &&
+                      new Date(certificateExpiresAt) < new Date(new Date().toDateString()) && (
+                        <p className="text-[10px] font-bold text-rose-600 mt-1">
+                          ⚠ Certificat expiré
+                        </p>
+                      )}
+                  </div>
+
+                  <div className="flex flex-col justify-end">
+                    <label className="text-[11px] font-bold text-slate-600 mb-1">
+                      Justificatif / Certificat
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setIsProofModalOpen(true)}
+                      className={`w-full py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        certificateProofUrl
+                          ? 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>
+                        {certificateProofUrl ? 'Preuve (Jointe)' : 'Preuve'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* E. Allo Halal Verification Badge Checkbox */}
+                <label className="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={productVerifiedOfficial}
+                    onChange={(e) => setProductVerifiedOfficial(e.target.checked)}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-blue-700 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                    Afficher le badge « Vérifié par Allo Halal » (preuve incluse)
+                  </span>
+                </label>
 
                 {productVerifiedOfficial && (
                   <p className="text-[11px] text-blue-600 font-medium flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    Ce produit affichera le badge officiel "Vérification Officielle Allo Halal" dans l'application.
+                    Le bloc bleu « Vérifié par Allo Halal » s&apos;affichera dans l&apos;application mobile.
                   </p>
                 )}
               </div>
 
-              {/* Action Buttons */}
+              {/* F. Automatic Verification Record (Read-Only) */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-slate-100/80 border border-slate-200 text-[11px] text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-slate-500" />
+                  <span>
+                    Vérifié par <strong className="text-slate-900">{fullEditProduct?.verifiedBy || currentAdminName}</strong>{' '}
+                    ({fullEditProduct?.verifiedAt
+                      ? new Date(fullEditProduct.verifiedAt).toLocaleString('fr-FR')
+                      : 'sera enregistré à la validation'})
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Automatique
+                </span>
+              </div>
+
+              {/* G. Footer Actions */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsProductModalOpen(false)}
                   className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                 >
-                  Cancel
+                  Annuler
                 </button>
                 <button
                   type="submit"
@@ -1022,10 +1266,104 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                   className={`px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-98 disabled:opacity-50 ${c.primaryBg} ${c.primaryBgHover}`}
                 >
                   <Check className="w-4 h-4" />
-                  <span>{fullEditProduct ? 'Save Changes' : 'Add Product'}</span>
+                  <span>{isSubmitting ? 'Enregistrement...' : 'Enregistrer'}</span>
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Proof Document Management Modal */}
+      {isProofModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-blue-600" />
+                <h3 className="text-sm font-bold text-slate-900">Preuve de Certification</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProofModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {certificateProofUrl ? (
+              <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200 space-y-2.5">
+                <div className="text-xs font-bold text-slate-900 truncate">
+                  {certificateProofName || 'Document de preuve'}
+                </div>
+                {/\.(png|jpe?g|webp)$/i.test(certificateProofUrl) && (
+                  <img
+                    src={certificateProofUrl}
+                    alt="Preuve de certification"
+                    className="w-full max-h-56 object-contain rounded-lg border border-slate-200 bg-white"
+                  />
+                )}
+                <div className="flex items-center gap-2">
+                  <a
+                    href={certificateProofUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Voir le document</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCertificateProofUrl('');
+                      setCertificateProofName('');
+                    }}
+                    className="py-2 px-3 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold cursor-pointer"
+                  >
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 rounded-xl border-2 border-dashed border-slate-200 text-center text-xs text-slate-500">
+                Aucun document de preuve joint pour ce produit.
+              </div>
+            )}
+
+            <input
+              ref={proofInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              onChange={handleProofFileChange}
+              className="hidden"
+            />
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => proofInputRef.current?.click()}
+                disabled={isUploadingProof}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Upload className="w-4 h-4" />
+                <span>
+                  {isUploadingProof
+                    ? 'Téléversement...'
+                    : certificateProofUrl
+                      ? 'Remplacer le document'
+                      : 'Téléverser un justificatif (PDF / Image)'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsProofModalOpen(false)}
+                className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
           </div>
         </div>
       )}
