@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbPool } from '@/lib/totp';
+import { notifyUnknownProductSubscribers } from '@/lib/notify-subscribers';
 
 const VALID_STATUSES = new Set(['nouveau', 'en_cours', 'traite', 'rejete']);
 
@@ -238,7 +239,21 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Record not found.' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, item: res.rows[0] });
+    const updatedItem = res.rows[0];
+    let notifiedCount = 0;
+    if (status === 'traite' || linkedProductId) {
+      let prodName: string | null = null;
+      if (updatedItem.linked_product_id) {
+        const pRes = await db.query(`SELECT name FROM public.products WHERE id = $1 LIMIT 1`, [
+          updatedItem.linked_product_id,
+        ]);
+        prodName = pRes.rows[0]?.name || null;
+      }
+      const notifyRes = await notifyUnknownProductSubscribers(db, updatedItem.barcode, prodName);
+      notifiedCount = notifyRes.notifiedCount;
+    }
+
+    return NextResponse.json({ success: true, item: updatedItem, notifiedCount });
   } catch (err: any) {
     console.error('PATCH unknown-products error:', err);
     return NextResponse.json({ success: false, error: err?.message || 'Update failed.' }, { status: 500 });

@@ -516,133 +516,164 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
 
       {/* Unknown Product Detail Modal */}
       {selectedItem && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-5 my-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Barcode className="w-5 h-5 text-emerald-600" />
-                  <span>Unknown Product — {selectedItem.barcode}</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {selectedItem.scansCount} scan(s) • {selectedItem.submissionsCount} submission(s) • First scanned{' '}
-                  {new Date(selectedItem.firstScannedAt).toLocaleDateString()}
-                </p>
+        <div className="fixed inset-0 z-50 bg-slate-900/55 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Sticky Modal Header */}
+            <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between gap-4 shrink-0">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center border shrink-0 ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder}`}>
+                  <Barcode className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">Unknown Product</h3>
+                    <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-800">
+                      {selectedItem.barcode}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-1">
+                    <span className="font-semibold text-slate-700">{selectedItem.scansCount} scan(s)</span>
+                    <span>•</span>
+                    <span className="font-semibold text-blue-700">{selectedItem.submissionsCount} request(s)</span>
+                    <span>•</span>
+                    <span>First seen {new Date(selectedItem.firstScannedAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedItem(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Submitted Photos Grid */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5">
-                Submitted Photos
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
-                  { label: '1. Front of Product', url: selectedItem.frontImageUrl },
-                  { label: '2. Ingredients List', url: selectedItem.ingredientsImageUrl },
-                  { label: '3. Certification Logo', url: selectedItem.certifierImageUrl },
-                ].map((photo) => (
-                  <div
-                    key={photo.label}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 space-y-2"
-                  >
-                    <div className="text-[11px] font-bold text-slate-700">{photo.label}</div>
-                    {photo.url ? (
-                      <button
-                        type="button"
-                        onClick={() => setPreviewPhotoUrl(photo.url!)}
-                        className="w-full h-36 rounded-lg overflow-hidden border border-slate-200 bg-white block cursor-pointer hover:opacity-90"
-                      >
-                        <img
-                          src={photo.url}
-                          alt={photo.label}
-                          className="w-full h-full object-cover"
-                        />
-                      </button>
-                    ) : (
-                      <div className="w-full h-36 rounded-lg border border-dashed border-slate-200 bg-white flex flex-col items-center justify-center text-[11px] text-slate-400">
-                        <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        Not provided
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* User Submissions List */}
-            {selectedItem.submissions && selectedItem.submissions.length > 0 && (
+            {/* Scrollable Body */}
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              {/* Submitted Photos Grid */}
               <div>
-                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                  Submission History ({selectedItem.submissions.length})
-                </h4>
-                <div className="max-h-40 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-2.5 bg-slate-50/60">
-                  {selectedItem.submissions.map((sub) => (
+                <div className="flex items-center justify-between mb-2.5">
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Submitted Photos
+                  </h4>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    Click any photo to zoom
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  {[
+                    { label: '1. Front of Product', url: selectedItem.frontImageUrl },
+                    { label: '2. Ingredients List', url: selectedItem.ingredientsImageUrl },
+                    { label: '3. Certification Logo', url: selectedItem.certifierImageUrl },
+                  ].map((photo) => (
                     <div
-                      key={sub.id}
-                      className="flex flex-wrap items-center justify-between gap-2 bg-white p-2.5 rounded-lg border border-slate-200 text-xs"
+                      key={photo.label}
+                      className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 space-y-2"
                     >
-                      <div className="flex items-center gap-2">
-                        <User className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="font-semibold text-slate-800">
-                          {sub.userEmail || sub.deviceId || 'Anonymous'}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          • {new Date(sub.createdAt).toLocaleString()}
-                        </span>
-                      </div>
-                      {sub.notifyWhenReady && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                          <Bell className="w-3 h-3" />
-                          {sub.notifiedAt ? 'Notified' : 'Notify Requested'}
-                        </span>
+                      <div className="text-[11px] font-bold text-slate-700">{photo.label}</div>
+                      {photo.url ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewPhotoUrl(photo.url!)}
+                          className="relative group w-full h-40 rounded-xl overflow-hidden border border-slate-200 bg-white block cursor-pointer"
+                        >
+                          <img
+                            src={photo.url}
+                            alt={photo.label}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                          <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/25 transition-colors flex items-center justify-center">
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity px-2.5 py-1 rounded-lg bg-white/95 text-slate-900 text-[11px] font-bold flex items-center gap-1 shadow-sm">
+                              <Eye className="w-3.5 h-3.5" /> Zoom
+                            </span>
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="w-full h-40 rounded-xl border border-dashed border-slate-200 bg-white flex flex-col items-center justify-center text-[11px] text-slate-400">
+                          <ImageIcon className="w-5 h-5 mb-1.5 opacity-40" />
+                          Not provided
+                        </div>
                       )}
                     </div>
                   ))}
                 </div>
               </div>
-            )}
 
-            {/* Admin Actions: Status, Link to Existing Product, Create Product */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Processing Status
-                </label>
-                <select
-                  value={statusInput}
-                  onChange={(e) => setStatusInput(e.target.value as UnknownProductStatus)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
-                >
-                  <option value="nouveau">New</option>
-                  <option value="en_cours">In Progress</option>
-                  <option value="traite">Processed</option>
-                  <option value="rejete">Rejected</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1">
-                  <Link2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Link to Existing Product (Barcode)</span>
-                </label>
-                <input
-                  type="text"
-                  value={linkBarcodeInput}
-                  onChange={(e) => setLinkBarcodeInput(e.target.value)}
-                  placeholder="e.g. 3512690000019 (optional)"
-                  className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
-                />
+              {/* User Submissions List */}
+              {selectedItem.submissions && selectedItem.submissions.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                    Submission History ({selectedItem.submissions.length})
+                  </h4>
+                  <div className="max-h-40 overflow-y-auto space-y-2 border border-slate-200 rounded-2xl p-3 bg-slate-50/60">
+                    {selectedItem.submissions.map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-2.5 rounded-xl border border-slate-200 text-xs shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="font-semibold text-slate-800 truncate">
+                            {sub.userEmail || sub.deviceId || 'Anonymous'}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            • {new Date(sub.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        {sub.notifyWhenReady && (
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                              sub.notifiedAt
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}
+                          >
+                            <Bell className="w-3 h-3" />
+                            {sub.notifiedAt ? 'Notified' : 'Notify Requested'}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin Actions: Status & Link to Existing Product */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                    Processing Status
+                  </label>
+                  <select
+                    value={statusInput}
+                    onChange={(e) => setStatusInput(e.target.value as UnknownProductStatus)}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  >
+                    <option value="nouveau">New</option>
+                    <option value="en_cours">In Progress</option>
+                    <option value="traite">Processed (Notifies Subscribers)</option>
+                    <option value="rejete">Rejected</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1.5">
+                    <Link2 className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Link to Existing Product (Barcode)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={linkBarcodeInput}
+                    onChange={(e) => setLinkBarcodeInput(e.target.value)}
+                    placeholder="e.g. 3512690000019 (optional)"
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+            {/* Sticky Footer */}
+            <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2.5 shrink-0">
               {perms.canAddProduct ? (
                 <button
                   type="button"
