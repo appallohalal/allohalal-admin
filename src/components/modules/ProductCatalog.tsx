@@ -881,10 +881,10 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
 
       {/* 4. ADD / EDIT FULL PRODUCT MODAL */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-5 my-6">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Sticky Modal Header */}
+            <div className="px-6 py-4 bg-slate-50/80 border-b border-slate-200 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
                 <div
                   className={`w-10 h-10 rounded-xl flex items-center justify-center border ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder}`}
@@ -903,13 +903,17 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
               <button
                 type="button"
                 onClick={() => setIsProductModalOpen(false)}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveFullProduct} className="space-y-4">
+            <form
+              id="product-details-form"
+              onSubmit={handleSaveFullProduct}
+              className="p-6 space-y-4 overflow-y-auto flex-1"
+            >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Barcode */}
                 <div>
@@ -1366,25 +1370,27 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                 </span>
               </div>
 
-              {/* G. Footer Actions */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsProductModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-98 disabled:opacity-50 ${c.primaryBg} ${c.primaryBgHover}`}
-                >
-                  <Check className="w-4 h-4" />
-                  <span>{isSubmitting ? 'Enregistrement...' : 'Enregistrer'}</span>
-                </button>
-              </div>
             </form>
+
+            {/* G. Sticky Footer Actions */}
+            <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-white border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                form="product-details-form"
+                disabled={isSubmitting}
+                className={`px-6 py-2.5 rounded-xl text-xs font-bold text-white shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-98 disabled:opacity-50 ${c.primaryBg} ${c.primaryBgHover}`}
+              >
+                <Check className="w-4 h-4" />
+                <span>{isSubmitting ? 'Enregistrement...' : 'Enregistrer'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
