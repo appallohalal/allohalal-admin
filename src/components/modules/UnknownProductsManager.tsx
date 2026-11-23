@@ -27,8 +27,6 @@ import {
   Trash2,
   X,
   CheckCircle2,
-  Clock,
-  AlertTriangle,
   Bell,
   Link2,
   Flag,
@@ -52,25 +50,25 @@ const STATUS_META: Record<
   { label: string; bg: string; text: string; border: string }
 > = {
   nouveau: {
-    label: 'Nouveau',
+    label: 'New',
     bg: 'bg-blue-50',
     text: 'text-blue-700',
     border: 'border-blue-200',
   },
   en_cours: {
-    label: 'En cours de traitement',
+    label: 'In Progress',
     bg: 'bg-amber-50',
     text: 'text-amber-700',
     border: 'border-amber-200',
   },
   traite: {
-    label: 'Traité',
+    label: 'Processed',
     bg: 'bg-emerald-50',
     text: 'text-emerald-700',
     border: 'border-emerald-200',
   },
   rejete: {
-    label: 'Rejeté',
+    label: 'Rejected',
     bg: 'bg-rose-50',
     text: 'text-rose-700',
     border: 'border-rose-200',
@@ -97,7 +95,6 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
   const [isLoading, setIsLoading] = useState(true);
 
   const [selectedItem, setSelectedItem] = useState<UnknownProduct | null>(null);
-  const [notesInput, setNotesInput] = useState('');
   const [statusInput, setStatusInput] = useState<UnknownProductStatus>('nouveau');
   const [linkBarcodeInput, setLinkBarcodeInput] = useState('');
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
@@ -131,7 +128,6 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
 
   const openDetails = (item: UnknownProduct) => {
     setSelectedItem(item);
-    setNotesInput(item.notes || '');
     setStatusInput(item.status);
     setLinkBarcodeInput('');
   };
@@ -146,7 +142,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
           p.id === linkBarcodeInput.trim()
       );
       if (!match) {
-        toast.error('Aucun produit existant trouvé pour ce code-barres.', 'Lien introuvable');
+        toast.error('No existing product found for this barcode.', 'Link Not Found');
         return;
       }
       linkedId = match.id;
@@ -155,24 +151,23 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
     const ok = await updateUnknownProduct({
       id: selectedItem.id,
       status: linkedId ? 'traite' : statusInput,
-      notes: notesInput,
       linkedProductId: linkedId,
     });
 
     if (ok) {
-      toast.success('Statut mis à jour.', 'Produit inconnu');
+      toast.success('Status updated successfully.', 'Unknown Product');
       setSelectedItem(null);
       await loadData();
     } else {
-      toast.error('Impossible de mettre à jour.', 'Erreur');
+      toast.error('Unable to update status.', 'Error');
     }
   };
 
   const handleDelete = async (item: UnknownProduct) => {
-    if (!confirm(`Supprimer le produit inconnu ${item.barcode} ?`)) return;
+    if (!confirm(`Delete unknown product ${item.barcode}?`)) return;
     const ok = await deleteUnknownProduct(item.id);
     if (ok) {
-      toast.success('Entrée supprimée.');
+      toast.success('Entry deleted.');
       await loadData();
     }
   };
@@ -187,7 +182,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
       reviewedBy: currentAdminName,
     });
     if (ok) {
-      toast.success('Signalement mis à jour.');
+      toast.success('Report status updated.');
       await loadData();
     }
   };
@@ -215,10 +210,10 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
           </div>
           <div>
             <h2 className="text-base font-bold text-slate-900">
-              Produits inconnus &amp; Signalements
+              Unknown Products &amp; Error Reports
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 font-medium">
-              Consultez les codes-barres scannés absents de la base et créez les fiches produits à partir des photos des utilisateurs.
+              Review unlisted scanned barcodes and create official product records from user-submitted photos.
             </p>
           </div>
         </div>
@@ -234,7 +229,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
             }`}
           >
             <Barcode className="w-3.5 h-3.5" />
-            <span>Produits inconnus ({isLoading && total === 0 ? '...' : total})</span>
+            <span>Unknown Products ({total})</span>
           </button>
           <button
             type="button"
@@ -246,7 +241,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
             }`}
           >
             <Flag className="w-3.5 h-3.5" />
-            <span>Signalements ({pendingReportsCount})</span>
+            <span>Error Reports ({pendingReportsCount})</span>
           </button>
         </div>
       </div>
@@ -258,11 +253,11 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               {(
                 [
-                  { id: 'ALL', label: 'Tous' },
-                  { id: 'nouveau', label: 'Nouveau' },
-                  { id: 'en_cours', label: 'En cours de traitement' },
-                  { id: 'traite', label: 'Traité' },
-                  { id: 'rejete', label: 'Rejeté' },
+                  { id: 'ALL', label: 'All' },
+                  { id: 'nouveau', label: 'New' },
+                  { id: 'en_cours', label: 'In Progress' },
+                  { id: 'traite', label: 'Processed' },
+                  { id: 'rejete', label: 'Rejected' },
                 ] as const
               ).map((tab) => (
                 <button
@@ -283,7 +278,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
               ))}
             </div>
             <div className="text-xs text-slate-500 font-medium">
-              {total} code(s)-barres enregistré(s)
+              {total} barcode(s) recorded
             </div>
           </div>
 
@@ -293,13 +288,13 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
               <table className="w-full text-left text-sm text-slate-700">
                 <thead className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <tr>
-                    <th className="py-3.5 px-4">Code-barres</th>
+                    <th className="py-3.5 px-4">Barcode</th>
                     <th className="py-3.5 px-4 text-center">Scans</th>
-                    <th className="py-3.5 px-4 text-center">Demandes</th>
+                    <th className="py-3.5 px-4 text-center">Requests</th>
                     <th className="py-3.5 px-4 text-center">Photos</th>
-                    <th className="py-3.5 px-4">1er scan</th>
-                    <th className="py-3.5 px-4">Dernier scan</th>
-                    <th className="py-3.5 px-4">Statut</th>
+                    <th className="py-3.5 px-4">First Scanned</th>
+                    <th className="py-3.5 px-4">Last Scanned</th>
+                    <th className="py-3.5 px-4">Status</th>
                     <th className="py-3.5 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -307,13 +302,13 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                   {isLoading ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-xs text-slate-400">
-                        Chargement des produits inconnus...
+                        Loading unknown products...
                       </td>
                     </tr>
                   ) : items.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-12 text-center text-xs text-slate-400">
-                        Aucun produit inconnu pour ce filtre.
+                        No unknown products found for this filter.
                       </td>
                     </tr>
                   ) : (
@@ -355,10 +350,10 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-xs text-slate-500">
-                            {new Date(item.firstScannedAt).toLocaleDateString('fr-FR')}
+                            {new Date(item.firstScannedAt).toLocaleDateString()}
                           </td>
                           <td className="py-3.5 px-4 text-xs text-slate-500">
-                            {new Date(item.lastScannedAt).toLocaleString('fr-FR')}
+                            {new Date(item.lastScannedAt).toLocaleString()}
                           </td>
                           <td className="py-3.5 px-4">
                             <span
@@ -375,7 +370,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                                 className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <Eye className="w-3.5 h-3.5" />
-                                <span>Détails</span>
+                                <span>Details</span>
                               </button>
                               {perms.canAddProduct && item.status !== 'traite' && (
                                 <button
@@ -390,7 +385,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                                   className={`px-2.5 py-1.5 rounded-xl text-white text-xs font-bold inline-flex items-center gap-1 cursor-pointer ${c.primaryBg} ${c.primaryBgHover}`}
                                 >
                                   <Plus className="w-3.5 h-3.5" />
-                                  <span>Créer</span>
+                                  <span>Create</span>
                                 </button>
                               )}
                               {perms.canDeleteUnknownProducts && (
@@ -398,7 +393,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                                   type="button"
                                   onClick={() => handleDelete(item)}
                                   className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 cursor-pointer"
-                                  title="Supprimer"
+                                  title="Delete"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -425,7 +420,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     className="px-2.5 py-1 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer flex items-center gap-1"
                   >
-                    <ChevronLeft className="w-3.5 h-3.5" /> Préc.
+                    <ChevronLeft className="w-3.5 h-3.5" /> Prev
                   </button>
                   <button
                     type="button"
@@ -433,7 +428,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     className="px-2.5 py-1 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer flex items-center gap-1"
                   >
-                    Suiv. <ChevronRight className="w-3.5 h-3.5" />
+                    Next <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -448,11 +443,11 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
             <table className="w-full text-left text-sm text-slate-700">
               <thead className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="py-3.5 px-4">Produit / Code-barres</th>
+                  <th className="py-3.5 px-4">Product / Barcode</th>
                   <th className="py-3.5 px-4">Type</th>
                   <th className="py-3.5 px-4">Description</th>
                   <th className="py-3.5 px-4">Date</th>
-                  <th className="py-3.5 px-4">Statut</th>
+                  <th className="py-3.5 px-4">Status</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -460,20 +455,20 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                 {reports.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-slate-400">
-                      Aucun signalement d&apos;erreur pour le moment.
+                      No error reports submitted yet.
                     </td>
                   </tr>
                 ) : (
                   reports.map((rep) => (
                     <tr key={rep.id} className="hover:bg-slate-50/60">
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900">{rep.productName || 'Produit'}</div>
+                        <div className="font-bold text-slate-900">{rep.productName || 'Product'}</div>
                         <div className="font-mono text-[11px] text-slate-500">{rep.barcode}</div>
                       </td>
                       <td className="py-3.5 px-4 capitalize font-semibold">{rep.reportType}</td>
                       <td className="py-3.5 px-4 max-w-sm text-slate-600">{rep.message}</td>
                       <td className="py-3.5 px-4 text-slate-500">
-                        {new Date(rep.createdAt).toLocaleString('fr-FR')}
+                        {new Date(rep.createdAt).toLocaleString()}
                       </td>
                       <td className="py-3.5 px-4">
                         <span
@@ -485,7 +480,11 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                                 : 'bg-amber-50 text-amber-700 border-amber-200'
                           }`}
                         >
-                          {rep.status}
+                          {rep.status === 'traite'
+                            ? 'Resolved'
+                            : rep.status === 'rejete'
+                              ? 'Dismissed'
+                              : 'New'}
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
@@ -495,14 +494,14 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                             onClick={() => handleUpdateReportStatus(rep, 'traite')}
                             className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold cursor-pointer"
                           >
-                            Traité
+                            Resolve
                           </button>
                           <button
                             type="button"
                             onClick={() => handleUpdateReportStatus(rep, 'rejete')}
                             className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-bold cursor-pointer"
                           >
-                            Rejeté
+                            Dismiss
                           </button>
                         </div>
                       </td>
@@ -523,11 +522,11 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <Barcode className="w-5 h-5 text-emerald-600" />
-                  <span>Produit inconnu — {selectedItem.barcode}</span>
+                  <span>Unknown Product — {selectedItem.barcode}</span>
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {selectedItem.scansCount} scan(s) • {selectedItem.submissionsCount} soumission(s) • Premier scan le{' '}
-                  {new Date(selectedItem.firstScannedAt).toLocaleDateString('fr-FR')}
+                  {selectedItem.scansCount} scan(s) • {selectedItem.submissionsCount} submission(s) • First scanned{' '}
+                  {new Date(selectedItem.firstScannedAt).toLocaleDateString()}
                 </p>
               </div>
               <button
@@ -542,13 +541,13 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
             {/* Submitted Photos Grid */}
             <div>
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5">
-                Photos soumises
+                Submitted Photos
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
-                  { label: '1. Face avant', url: selectedItem.frontImageUrl },
-                  { label: '2. Ingrédients', url: selectedItem.ingredientsImageUrl },
-                  { label: '3. Logo certification', url: selectedItem.certifierImageUrl },
+                  { label: '1. Front of Product', url: selectedItem.frontImageUrl },
+                  { label: '2. Ingredients List', url: selectedItem.ingredientsImageUrl },
+                  { label: '3. Certification Logo', url: selectedItem.certifierImageUrl },
                 ].map((photo) => (
                   <div
                     key={photo.label}
@@ -570,7 +569,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                     ) : (
                       <div className="w-full h-36 rounded-lg border border-dashed border-slate-200 bg-white flex flex-col items-center justify-center text-[11px] text-slate-400">
                         <ImageIcon className="w-5 h-5 mb-1 opacity-50" />
-                        Non fournie
+                        Not provided
                       </div>
                     )}
                   </div>
@@ -582,7 +581,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
             {selectedItem.submissions && selectedItem.submissions.length > 0 && (
               <div>
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                  Historique des soumissions ({selectedItem.submissions.length})
+                  Submission History ({selectedItem.submissions.length})
                 </h4>
                 <div className="max-h-40 overflow-y-auto space-y-2 border border-slate-200 rounded-xl p-2.5 bg-slate-50/60">
                   {selectedItem.submissions.map((sub) => (
@@ -593,16 +592,16 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                       <div className="flex items-center gap-2">
                         <User className="w-3.5 h-3.5 text-slate-400" />
                         <span className="font-semibold text-slate-800">
-                          {sub.userEmail || sub.deviceId || 'Anonyme'}
+                          {sub.userEmail || sub.deviceId || 'Anonymous'}
                         </span>
                         <span className="text-[11px] text-slate-400">
-                          • {new Date(sub.createdAt).toLocaleString('fr-FR')}
+                          • {new Date(sub.createdAt).toLocaleString()}
                         </span>
                       </div>
                       {sub.notifyWhenReady && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
                           <Bell className="w-3 h-3" />
-                          {sub.notifiedAt ? 'Notifié' : 'À prévenir'}
+                          {sub.notifiedAt ? 'Notified' : 'Notify Requested'}
                         </span>
                       )}
                     </div>
@@ -615,29 +614,29 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
-                  Statut de traitement
+                  Processing Status
                 </label>
                 <select
                   value={statusInput}
                   onChange={(e) => setStatusInput(e.target.value as UnknownProductStatus)}
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
                 >
-                  <option value="nouveau">Nouveau</option>
-                  <option value="en_cours">En cours de traitement</option>
-                  <option value="traite">Traité</option>
-                  <option value="rejete">Rejeté</option>
+                  <option value="nouveau">New</option>
+                  <option value="en_cours">In Progress</option>
+                  <option value="traite">Processed</option>
+                  <option value="rejete">Rejected</option>
                 </select>
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1 mb-1">
                   <Link2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Lier à un produit existant (Code-barres)</span>
+                  <span>Link to Existing Product (Barcode)</span>
                 </label>
                 <input
                   type="text"
                   value={linkBarcodeInput}
                   onChange={(e) => setLinkBarcodeInput(e.target.value)}
-                  placeholder="ex. 3512690000019 (optionnel)"
+                  placeholder="e.g. 3512690000019 (optional)"
                   className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900"
                 />
               </div>
@@ -659,7 +658,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer ${c.primaryBg} ${c.primaryBgHover}`}
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Créer la fiche produit</span>
+                  <span>Create Product Sheet</span>
                 </button>
               ) : (
                 <div />
@@ -671,7 +670,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                   onClick={() => setSelectedItem(null)}
                   className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
                 >
-                  Fermer
+                  Close
                 </button>
                 <button
                   type="button"
@@ -679,7 +678,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
                   className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 flex items-center gap-1.5 cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Enregistrer le statut</span>
+                  <span>Save Status</span>
                 </button>
               </div>
             </div>
@@ -695,7 +694,7 @@ export const UnknownProductsManager: React.FC<UnknownProductsManagerProps> = ({
         >
           <img
             src={previewPhotoUrl}
-            alt="Aperçu"
+            alt="Preview"
             className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl"
           />
         </div>

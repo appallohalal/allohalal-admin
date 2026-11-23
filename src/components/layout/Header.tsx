@@ -24,8 +24,8 @@ const TAB_TITLES: Record<NavTab, { title: string; desc: string }> = {
     desc: 'Catalog and review',
   },
   unknown_products: {
-    title: 'Produits inconnus',
-    desc: 'Codes-barres inconnus, photos et signalements',
+    title: 'Unknown Products',
+    desc: 'Unlisted barcodes, submitted photos & error reports',
   },
   contributions: {
     title: 'Contributions',

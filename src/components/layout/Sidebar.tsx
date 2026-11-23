@@ -55,8 +55,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, curren
     },
     {
       id: 'unknown_products' as NavTab,
-      label: 'Produits inconnus',
-      sublabel: 'Scans & Signalements',
+      label: 'Unknown Products',
+      sublabel: 'Scans & Reports',
       icon: HelpCircle,
     },
     {
