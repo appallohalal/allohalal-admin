@@ -196,6 +196,7 @@ export interface GroqSettings {
   isEnabled: boolean;
   temperature: number;
   maxTokens: number;
+  allowedCountries?: string[];
   updatedAt: string;
   updatedBy: string;
 }
@@ -262,6 +263,7 @@ export interface AdMobSettings {
   testIosNativeId: string;
   testIosRewardedId: string;
 
+  allowedCountries?: string[];
   updatedAt: string;
   updatedBy: string;
 }
@@ -326,6 +328,7 @@ export interface AuthSettings {
   paypalMeUrl?: string;
   paypalCurrency?: string;
 
+  allowedCountries?: string[];
   updatedAt: string;
   updatedBy: string;
 }
@@ -352,6 +355,7 @@ export interface NotificationSettings {
   firebaseServiceAccountJson: string;
   firebaseServerKey?: string;
   isEnabled: boolean;
+  allowedCountries?: string[];
   updatedAt: string;
   updatedBy: string;
 }
@@ -420,6 +424,7 @@ export interface CmsSettings {
   id: string;
   texts: CmsTexts;
   translations?: Record<string, Partial<CmsTexts>>;
+  allowedCountries?: string[];
   updatedAt: string;
   updatedBy: string;
 }

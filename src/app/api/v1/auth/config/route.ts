@@ -75,6 +75,11 @@ export async function GET() {
       paypalClientId: s.paypal_client_id || '',
       paypalMeUrl: s.paypal_me_url || '',
       paypalCurrency: s.paypal_currency || 'eur',
+      allowedCountries: Array.isArray(s.allowed_countries) && s.allowed_countries.length > 0
+        ? s.allowed_countries
+        : (typeof s.allowed_countries === 'string'
+            ? (() => { try { const p = JSON.parse(s.allowed_countries); return Array.isArray(p) && p.length > 0 ? p : ['France']; } catch (_) { return ['France']; } })()
+            : ['France']),
       updatedAt: s.updated_at || new Date().toISOString(),
       updatedBy: s.updated_by || 'Admin',
     });
@@ -128,6 +133,9 @@ export async function POST(req: NextRequest) {
     if (body.contributionTitle !== undefined) payload.contribution_title = String(body.contributionTitle).trim();
     if (body.contributionSubtitle !== undefined) payload.contribution_subtitle = String(body.contributionSubtitle).trim();
     if (body.contributionDesc !== undefined) payload.contribution_desc = String(body.contributionDesc).trim();
+    if (Array.isArray(body.allowedCountries) && body.allowedCountries.length > 0) {
+      payload.allowed_countries = body.allowedCountries.map((c: any) => String(c).trim()).filter(Boolean);
+    }
 
     let { data, error } = await supabase
       .from('auth_settings')

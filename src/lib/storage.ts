@@ -491,6 +491,37 @@ export const deleteUserAccount = async (userId: string): Promise<UserAccount[]> 
   return fetchUsers();
 };
 
+export const updateUserAccount = async (
+  userId: string,
+  updates: {
+    name?: string;
+    username?: string;
+    email?: string;
+    country?: string;
+    city?: string;
+    isPremium?: boolean;
+  }
+): Promise<UserAccount[]> => {
+  const payload: Record<string, any> = {};
+  if (updates.name !== undefined) payload.name = updates.name.trim();
+  if (updates.username !== undefined) payload.username = updates.username.trim();
+  if (updates.email !== undefined) payload.email = updates.email.trim().toLowerCase();
+  if (updates.country !== undefined) payload.country = updates.country.trim();
+  if (updates.city !== undefined) payload.city = updates.city.trim();
+  if (updates.isPremium !== undefined) payload.is_premium = updates.isPremium;
+
+  const { error } = await supabase
+    .from('users')
+    .update(payload)
+    .eq('id', userId);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to update user profile');
+  }
+
+  return fetchUsers();
+};
+
 // ==========================================
 // 4. GEO ADS (Supabase integration)
 // ==========================================
@@ -1121,6 +1152,7 @@ export const DEFAULT_AUTH_SETTINGS: AuthSettings = {
   paypalSecretKey: process.env.PAYPAL_SECRET_KEY || '',
   paypalMeUrl: process.env.NEXT_PUBLIC_PAYPAL_ME_URL || '',
   paypalCurrency: 'eur',
+  allowedCountries: ['France'],
   updatedAt: new Date().toISOString(),
   updatedBy: 'Admin',
 };
@@ -1190,6 +1222,11 @@ export const fetchAuthSettings = async (): Promise<AuthSettings> => {
         paypalSecretKey: (data.paypal_secret_key || process.env.PAYPAL_SECRET_KEY || '').trim(),
         paypalMeUrl: (data.paypal_me_url || process.env.NEXT_PUBLIC_PAYPAL_ME_URL || '').trim(),
         paypalCurrency: (data.paypal_currency || 'eur').toLowerCase(),
+        allowedCountries: Array.isArray(data.allowed_countries) && data.allowed_countries.length > 0
+          ? data.allowed_countries
+          : (typeof data.allowed_countries === 'string'
+              ? (() => { try { const p = JSON.parse(data.allowed_countries); return Array.isArray(p) && p.length > 0 ? p : ['France']; } catch (_) { return ['France']; } })()
+              : ['France']),
         updatedAt: data.updated_at || new Date().toISOString(),
         updatedBy: data.updated_by || 'Admin',
       };
@@ -1229,6 +1266,9 @@ export const saveAuthSettings = async (
     enable_contributions: settings.enableContributions !== false,
     require_email_verification: Boolean(settings.requireEmailVerification),
     send_welcome_email: settings.sendWelcomeEmail !== false,
+    allowed_countries: Array.isArray(settings.allowedCountries) && settings.allowedCountries.length > 0
+      ? settings.allowedCountries
+      : ['France'],
     email_provider: settings.emailProvider || 'BOTH',
     smtp_host: (settings.smtpHost || '').trim(),
     smtp_port: Number(settings.smtpPort || 587),

@@ -39,6 +39,7 @@ import {
   toggleUserBan,
   toggleUserPremium,
   deleteUserAccount,
+  updateUserAccount,
   fetchAds,
   saveGeoAd,
   deleteGeoAd,
@@ -344,6 +345,25 @@ export default function AdminDashboardPage() {
     setUsers(updated);
   };
 
+  const handleUpdateUser = async (
+    userId: string,
+    updates: {
+      name?: string;
+      username?: string;
+      email?: string;
+      country?: string;
+      city?: string;
+      isPremium?: boolean;
+    }
+  ) => {
+    if (!getRolePermissions(currentUser?.role).canViewAppUsers) {
+      toast.error('Permission denied.', 'Access Restricted');
+      return;
+    }
+    const updated = await updateUserAccount(userId, updates);
+    setUsers(updated);
+  };
+
   const handleSaveAd = async (ad: GeoAd) => {
     const updated = await saveGeoAd(ad);
     setAds(updated);
@@ -547,6 +567,7 @@ export default function AdminDashboardPage() {
                 onToggleBan={handleToggleBan}
                 onTogglePremium={handleTogglePremium}
                 onDeleteUser={handleDeleteUser}
+                onUpdateUser={handleUpdateUser}
                 searchQuery={searchQuery}
                 authSettings={authSettings}
                 onSaveAuthSettings={handleSaveAuthSettings}

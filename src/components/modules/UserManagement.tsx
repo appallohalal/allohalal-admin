@@ -25,14 +25,42 @@ import {
   EyeOff,
   Trash2,
   FileEdit,
+  Globe,
+  Plus,
 } from 'lucide-react';
 import { RegistrationEmailEditor } from './RegistrationEmailEditor';
+
+const PRESET_SIGNUP_COUNTRIES = [
+  'France',
+  'Belgique',
+  'Suisse',
+  'Canada',
+  'Royaume-Uni',
+  'Allemagne',
+  'Espagne',
+  'Italie',
+  'Maroc',
+  'Algérie',
+  'Tunisie',
+  'États-Unis',
+];
 
 interface UserManagementProps {
   users?: UserAccount[];
   onToggleBan?: (userId: string, reason?: string) => void;
   onTogglePremium?: (userId: string) => void;
   onDeleteUser?: (userId: string) => Promise<void>;
+  onUpdateUser?: (
+    userId: string,
+    updates: {
+      name?: string;
+      username?: string;
+      email?: string;
+      country?: string;
+      city?: string;
+      isPremium?: boolean;
+    }
+  ) => Promise<void>;
   searchQuery?: string;
   authSettings?: AuthSettings;
   onSaveAuthSettings?: (settings: AuthSettings) => Promise<void>;
@@ -44,6 +72,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   onToggleBan,
   onTogglePremium,
   onDeleteUser,
+  onUpdateUser,
   searchQuery = '',
   authSettings: initialSettings,
   onSaveAuthSettings,
@@ -54,6 +83,18 @@ export const UserManagement: React.FC<UserManagementProps> = ({
   const [showSmtpSettings, setShowSmtpSettings] = useState(false);
   const [showSmtpPass, setShowSmtpPass] = useState(false);
   const [showEmailEditor, setShowEmailEditor] = useState(false);
+  const [customCountryInput, setCustomCountryInput] = useState('');
+  const [isSavingCountries, setIsSavingCountries] = useState(false);
+  const [editUser, setEditUser] = useState<UserAccount | null>(null);
+  const [editUserForm, setEditUserForm] = useState({
+    name: '',
+    username: '',
+    email: '',
+    country: '',
+    city: '',
+    isPremium: false,
+  });
+  const [isSavingUser, setIsSavingUser] = useState(false);
 
   // Users table state
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'BANNED' | 'PREMIUM'>('ALL');
@@ -180,6 +221,71 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     if (!onToggleBan) return;
     onToggleBan(user.id);
     toast.success(`User ${user.name || user.email || 'account'} has been unbanned.`, 'User Unbanned');
+  };
+
+  const allowedCountries =
+    Array.isArray(form.allowedCountries) && form.allowedCountries.length > 0
+      ? form.allowedCountries
+      : ['France'];
+
+  const handleSaveCountries = async (nextCountries: string[]) => {
+    if (!onSaveAuthSettings || isSavingCountries) return;
+    const cleaned = Array.from(new Set(nextCountries.map((item) => item.trim()).filter(Boolean)));
+    if (cleaned.length === 0) {
+      toast.error('At least one country must remain enabled for signup.', 'Country Required');
+      return;
+    }
+    setIsSavingCountries(true);
+    const updatedPayload: AuthSettings = {
+      ...form,
+      id: 'global',
+      allowedCountries: cleaned,
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentAdminName,
+    };
+    setForm(updatedPayload);
+    try {
+      await onSaveAuthSettings(updatedPayload);
+      toast.success(`Signup countries updated (${cleaned.length} active).`, 'Countries Saved');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save allowed countries.', 'Save Error');
+    } finally {
+      setIsSavingCountries(false);
+    }
+  };
+
+  const handleOpenEditUser = (user: UserAccount) => {
+    setEditUser(user);
+    setEditUserForm({
+      name: user.name || '',
+      username: user.username || '',
+      email: user.email || '',
+      country: user.country || 'France',
+      city: user.city || '',
+      isPremium: Boolean(user.isPremium),
+    });
+  };
+
+  const handleSaveEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUser || !onUpdateUser || isSavingUser) return;
+    setIsSavingUser(true);
+    try {
+      await onUpdateUser(editUser.id, {
+        name: editUserForm.name,
+        username: editUserForm.username,
+        email: editUserForm.email,
+        country: editUserForm.country,
+        city: editUserForm.city,
+        isPremium: editUserForm.isPremium,
+      });
+      toast.success(`Updated profile for ${editUserForm.name || editUserForm.email || 'user'}.`, 'User Updated');
+      setEditUser(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update user profile.', 'Update Error');
+    } finally {
+      setIsSavingUser(false);
+    }
   };
 
   const c = APP_COLORS.classes;
@@ -366,6 +472,117 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         </div>
       </div>
 
+      {/* 1.5 Signup Countries Configuration */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder} border`}>
+              <Globe className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm font-bold text-slate-900">
+                  Mobile Signup Countries
+                </h2>
+                <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`}>
+                  {allowedCountries.length} Enabled
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Choose which countries appear in the mobile app registration &amp; profile country selector.
+              </p>
+            </div>
+          </div>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = customCountryInput.trim();
+              if (!trimmed) return;
+              if (!allowedCountries.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+                handleSaveCountries([...allowedCountries, trimmed]);
+              }
+              setCustomCountryInput('');
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              type="text"
+              value={customCountryInput}
+              onChange={(e) => setCustomCountryInput(e.target.value)}
+              placeholder="Add custom country..."
+              className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#088839]/20 focus:border-[#088839]"
+            />
+            <button
+              type="submit"
+              disabled={isSavingCountries || !customCountryInput.trim()}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white ${c.primaryBg} hover:opacity-90 disabled:opacity-50 cursor-pointer`}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add</span>
+            </button>
+          </form>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {PRESET_SIGNUP_COUNTRIES.map((country) => {
+            const isActive = allowedCountries.some(
+              (item) => item.toLowerCase() === country.toLowerCase()
+            );
+            return (
+              <button
+                key={country}
+                type="button"
+                disabled={isSavingCountries}
+                onClick={() => {
+                  const next = isActive
+                    ? allowedCountries.filter((item) => item.toLowerCase() !== country.toLowerCase())
+                    : [...allowedCountries, country];
+                  handleSaveCountries(next);
+                }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer disabled:opacity-50 ${
+                  isActive
+                    ? `${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`
+                    : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                {isActive && <CheckCircle2 className="w-3.5 h-3.5" />}
+                <span>{country}</span>
+              </button>
+            );
+          })}
+          {allowedCountries
+            .filter(
+              (country) =>
+                !PRESET_SIGNUP_COUNTRIES.some(
+                  (preset) => preset.toLowerCase() === country.toLowerCase()
+                )
+            )
+            .map((customCountry) => (
+              <span
+                key={customCountry}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${c.primaryLightBg} ${c.primaryLightText} ${c.primaryLightBorder}`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{customCountry}</span>
+                <button
+                  type="button"
+                  disabled={isSavingCountries}
+                  onClick={() =>
+                    handleSaveCountries(
+                      allowedCountries.filter((item) => item !== customCountry)
+                    )
+                  }
+                  className="hover:text-rose-600 cursor-pointer"
+                  title={`Remove ${customCountry}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+        </div>
+      </div>
+
       {/* 2. Registered App Users List (Clean project pattern) */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
         {/* Header & Controls */}
@@ -548,6 +765,14 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                       {/* Action */}
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            title="Edit User Profile"
+                            onClick={() => handleOpenEditUser(user)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-[#088839] hover:bg-[#e6f4eb] border border-transparent hover:border-[#b5e0c5] transition-colors cursor-pointer"
+                          >
+                            <FileEdit className="w-3.5 h-3.5" />
+                          </button>
                           {user.isBanned ? (
                             <button
                               type="button"
@@ -882,6 +1107,118 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 {isDeletingUser ? 'Deleting...' : 'Delete Permanently'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Profile Modal */}
+      {editUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#e6f4eb] text-[#088839] border border-[#b5e0c5] flex items-center justify-center">
+                  <FileEdit className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Edit User Profile</h3>
+                  <p className="text-[11px] text-slate-500">{editUser.email || editUser.id}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditUser(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditUser} className="p-5 space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editUserForm.name}
+                    onChange={(e) => setEditUserForm((p) => ({ ...p, name: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#088839]/20 focus:border-[#088839]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Username</label>
+                  <input
+                    type="text"
+                    value={editUserForm.username}
+                    onChange={(e) => setEditUserForm((p) => ({ ...p, username: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#088839]/20 focus:border-[#088839]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1">Email</label>
+                <input
+                  type="email"
+                  required
+                  value={editUserForm.email}
+                  onChange={(e) => setEditUserForm((p) => ({ ...p, email: e.target.value }))}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#088839]/20 focus:border-[#088839]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Country</label>
+                  <input
+                    type="text"
+                    value={editUserForm.country}
+                    onChange={(e) => setEditUserForm((p) => ({ ...p, country: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#088839]/20 focus:border-[#088839]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">City</label>
+                  <input
+                    type="text"
+                    value={editUserForm.city}
+                    onChange={(e) => setEditUserForm((p) => ({ ...p, city: e.target.value }))}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#088839]/20 focus:border-[#088839]"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center justify-between p-3 rounded-xl bg-amber-50/70 border border-amber-200 cursor-pointer">
+                <div className="flex items-center gap-2">
+                  <Crown className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-bold text-amber-900">PRO / Supporter Badge</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={editUserForm.isPremium}
+                  onChange={(e) => setEditUserForm((p) => ({ ...p, isPremium: e.target.checked }))}
+                  className="w-4 h-4 accent-[#088839] cursor-pointer"
+                />
+              </label>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditUser(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingUser}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 ${c.primaryBg} hover:opacity-90`}
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{isSavingUser ? 'Saving...' : 'Save Changes'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
