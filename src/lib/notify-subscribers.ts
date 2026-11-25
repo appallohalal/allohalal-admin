@@ -74,28 +74,40 @@ export async function notifyUnknownProductSubscribers(
         ? productName.trim()
         : `Produit (${barcode})`;
 
-    const tokens: string[] = Array.from(
-      new Set(
-        subs.rows
-          .map((r: any) => r.fcm_token)
-          .filter((t: any) => typeof t === 'string' && t.trim().length > 0)
-      )
-    );
+    // Send at most ONE push notification per subscriber:
+    // Prefer direct device FCM token; only fall back to ONE user topic if token is absent or fails.
+    const tokenFallbacks = new Map<string, string | null>();
+    const fallbackTopics = new Set<string>();
+    const seenUsers = new Set<string>();
 
-    const topics: string[] = Array.from(
-      new Set(
-        subs.rows.flatMap((r: any) => {
-          const out: string[] = [];
-          if (typeof r.user_email === 'string' && r.user_email.trim().length > 0) {
-            out.push(`user_${sanitizeTopic(r.user_email)}`);
-          }
-          if (typeof r.user_id === 'string' && r.user_id.trim().length > 0) {
-            out.push(`user_${sanitizeTopic(r.user_id)}`);
-          }
-          return out;
-        })
-      )
-    );
+    for (const r of subs.rows) {
+      const userKey =
+        (typeof r.user_id === 'string' && r.user_id.trim()) ||
+        (typeof r.user_email === 'string' && r.user_email.trim().toLowerCase()) ||
+        r.id;
+
+      const singleTopic =
+        typeof r.user_id === 'string' && r.user_id.trim().length > 0
+          ? `user_${sanitizeTopic(r.user_id)}`
+          : typeof r.user_email === 'string' && r.user_email.trim().length > 0
+            ? `user_${sanitizeTopic(r.user_email)}`
+            : null;
+
+      const token =
+        typeof r.fcm_token === 'string' && r.fcm_token.trim().length > 0
+          ? r.fcm_token.trim()
+          : null;
+
+      if (token) {
+        if (!tokenFallbacks.has(token)) {
+          tokenFallbacks.set(token, singleTopic);
+        }
+        seenUsers.add(userKey);
+      } else if (singleTopic && !seenUsers.has(userKey)) {
+        seenUsers.add(userKey);
+        fallbackTopics.add(singleTopic);
+      }
+    }
 
     const emails: string[] = Array.from(
       new Set(
@@ -105,36 +117,54 @@ export async function notifyUnknownProductSubscribers(
       )
     );
 
-    if (tokens.length > 0 || topics.length > 0) {
+    if (tokenFallbacks.size > 0 || fallbackTopics.size > 0) {
       const auth = await getFcmAccessToken();
       if (auth) {
         const fcmEndpoint = `https://fcm.googleapis.com/v1/projects/${auth.projectId}/messages:send`;
-        const sendPayload = (target: { token?: string; topic?: string }) =>
-          fetch(fcmEndpoint, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${auth.accessToken}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              message: {
-                ...target,
-                notification: {
-                  title: 'Fiche produit disponible !',
-                  body: `${displayName} (${barcode}) a été ajouté au catalogue Allo Halal.`,
-                },
-                data: {
-                  type: 'product_ready',
-                  barcode,
-                },
+        const sendPayload = async (target: { token?: string; topic?: string }): Promise<boolean> => {
+          try {
+            const res = await fetch(fcmEndpoint, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${auth.accessToken}`,
+                'Content-Type': 'application/json',
               },
-            }),
-          }).catch(() => null);
+              body: JSON.stringify({
+                message: {
+                  ...target,
+                  notification: {
+                    title: 'Fiche produit disponible !',
+                    body: `${displayName} (${barcode}) a été ajouté au catalogue Allo Halal.`,
+                  },
+                  data: {
+                    type: 'product_ready',
+                    barcode,
+                  },
+                },
+              }),
+            });
+            return res.ok;
+          } catch {
+            return false;
+          }
+        };
 
-        await Promise.all([
-          ...tokens.map((token) => sendPayload({ token })),
-          ...topics.map((topic) => sendPayload({ topic })),
-        ]);
+        const sentFallbackTopics = new Set<string>(fallbackTopics);
+        await Promise.all(
+          Array.from(tokenFallbacks.entries()).map(async ([token, fallbackTopic]) => {
+            const ok = await sendPayload({ token });
+            if (!ok && fallbackTopic && !sentFallbackTopics.has(fallbackTopic)) {
+              sentFallbackTopics.add(fallbackTopic);
+              await sendPayload({ topic: fallbackTopic });
+            }
+          })
+        );
+
+        if (fallbackTopics.size > 0) {
+          await Promise.all(
+            Array.from(fallbackTopics).map((topic) => sendPayload({ topic }))
+          );
+        }
       }
     }
 

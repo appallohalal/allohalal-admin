@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Additive, HalalStatus } from '@/lib/types';
 import { SUPPORTED_LANGUAGES, SupportedLanguage } from '@/lib/languages';
 import { getRolePermissions } from '@/lib/permissions';
+import { parseCsvText, pickCsvField } from '@/lib/csv';
+import { toast } from '@/lib/toast';
 import {
   BookOpenCheck,
   Plus,
@@ -15,16 +17,19 @@ import {
   AlertTriangle,
   HelpCircle,
   Download,
+  Upload,
   Search,
   X,
   Check,
   Languages,
+  FileText,
 } from 'lucide-react';
 
 interface AdditivesDictionaryProps {
   additives: Additive[];
   onSaveAdditive: (additive: Additive) => void;
   onDeleteAdditive: (id: string) => void;
+  onRefreshAdditives?: () => Promise<void>;
   currentUserRole?: string;
   searchQuery: string;
 }
@@ -33,6 +38,7 @@ export const AdditivesDictionary: React.FC<AdditivesDictionaryProps> = ({
   additives,
   onSaveAdditive,
   onDeleteAdditive,
+  onRefreshAdditives,
   currentUserRole = 'Super Admin',
   searchQuery,
 }) => {
@@ -40,6 +46,11 @@ export const AdditivesDictionary: React.FC<AdditivesDictionaryProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAdditive, setEditingAdditive] = useState<Additive | null>(null);
   const [activeLangCode, setActiveLangCode] = useState<string>('en');
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importFileName, setImportFileName] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
 
   // Form State
   const [formCode, setFormCode] = useState('');
@@ -136,6 +147,120 @@ export const AdditivesDictionary: React.FC<AdditivesDictionaryProps> = ({
     downloadAnchor.remove();
   };
 
+  const downloadAdditiveCsvTemplate = () => {
+    const headers = [
+      'E-Code',
+      'Name (English)',
+      'Status',
+      'Source',
+      'Category',
+      'Description (EN)',
+      'Halal Reason (EN)',
+      'Name (FR)',
+      'Description (FR)',
+    ];
+    const sample = [
+      '"E100","Curcumin","HALAL","Plant","Food Coloring","Natural yellow pigment from turmeric","Derived from turmeric root","Curcumine","Colorant jaune naturel"',
+      '"E471","Mono- and Diglycerides of Fatty Acids","MUSHBOOH","Doubtful","Emulsifier","Commonly used food emulsifier","Can be animal or plant derived","Mono- et diglycérides","Émulsifiant"',
+    ];
+    const csv = '\uFEFF' + [headers.join(','), ...sample].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.setAttribute('download', 'allohalal_additives_template.csv');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleAdditiveCsvSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { rows } = parseCsvText(text);
+      const mapped = rows
+        .map((r) => {
+          const code = pickCsvField(r, ['E-Code', 'code', 'ecode', 'Additive Code']).toUpperCase();
+          const nameEn = pickCsvField(r, ['Name (English)', 'nameEn', 'name_en', 'Name', 'Additive Name (English)']);
+          const status = pickCsvField(r, ['Status', 'Halal Status']) || 'MUSHBOOH';
+          const source = pickCsvField(r, ['Source', 'Source / Origin', 'Origin']) || 'Doubtful';
+          const category = pickCsvField(r, ['Category', 'Type']) || '';
+          const descriptionEn = pickCsvField(r, ['Description (EN)', 'description_en', 'Description']);
+          const halalReasonEn = pickCsvField(r, ['Halal Reason (EN)', 'halalReason_en', 'Halal Reason', 'Reason']);
+          const nameFr = pickCsvField(r, ['Name (FR)', 'name_fr']);
+          const descriptionFr = pickCsvField(r, ['Description (FR)', 'description_fr']);
+          const halalReasonFr = pickCsvField(r, ['Halal Reason (FR)', 'halalReason_fr']);
+
+          const translations: Record<string, { name: string; description: string; halalReason: string }> = {
+            en: { name: nameEn, description: descriptionEn, halalReason: halalReasonEn },
+          };
+          if (nameFr || descriptionFr || halalReasonFr) {
+            translations.fr = {
+              name: nameFr || nameEn,
+              description: descriptionFr,
+              halalReason: halalReasonFr,
+            };
+          }
+
+          return {
+            code,
+            nameEn,
+            status,
+            source,
+            category,
+            descriptionEn,
+            halalReasonEn,
+            translations,
+          };
+        })
+        .filter((item) => item.code && item.nameEn);
+
+      if (mapped.length === 0) {
+        toast.error('No valid rows found. Ensure your CSV has E-Code and Name (English) columns.', 'Invalid CSV');
+        return;
+      }
+      setImportFileName(file.name);
+      setImportRows(mapped);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to parse CSV file.', 'CSV Error');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleConfirmAdditiveImport = async () => {
+    if (importRows.length === 0 || isImporting) return;
+    setIsImporting(true);
+    try {
+      const res = await fetch('/api/v1/additives/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: importRows }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Import failed.');
+      }
+      if (onRefreshAdditives) {
+        await onRefreshAdditives();
+      }
+      toast.success(
+        `Imported ${data.created} new, ${data.updated} updated${data.skipped ? `, ${data.skipped} skipped` : ''}.`,
+        'Additives CSV Imported'
+      );
+      setIsImportModalOpen(false);
+      setImportRows([]);
+      setImportFileName('');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to import additives CSV.', 'Import Error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   // Filter
   const filtered = additives.filter((a) => {
     const query = searchQuery.toLowerCase();
@@ -199,14 +324,29 @@ export const AdditivesDictionary: React.FC<AdditivesDictionaryProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {perms.canExportAdditives && (
             <button
               onClick={exportForFlutter}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors cursor-pointer"
             >
               <Download className="w-4 h-4 text-slate-500" />
               Export Mobile JSON
+            </button>
+          )}
+
+          {perms.canAddAdditive && (
+            <button
+              type="button"
+              onClick={() => {
+                setImportRows([]);
+                setImportFileName('');
+                setIsImportModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-slate-500" />
+              Import CSV
             </button>
           )}
 
@@ -536,6 +676,123 @@ export const AdditivesDictionary: React.FC<AdditivesDictionaryProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import Additives CSV Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center">
+                  <Upload className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Import Additives from CSV</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Bulk-add or update E-numbers by code (columns: E-Code, Name (English), Status, Source, Category)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <FileText className="w-4 h-4 text-emerald-600" />
+                  <span>Need a template? Download a sample CSV file.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={downloadAdditiveCsvTemplate}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Template</span>
+                </button>
+              </div>
+
+              <input
+                ref={csvInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleAdditiveCsvSelected}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => csvInputRef.current?.click()}
+                className="w-full py-6 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-xl bg-slate-50/50 hover:bg-emerald-50/30 transition-colors flex flex-col items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Upload className="w-6 h-6 text-emerald-600" />
+                <span className="text-xs font-bold text-slate-800">
+                  {importFileName ? `Selected: ${importFileName}` : 'Click to choose a .csv file'}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {importRows.length > 0 ? `${importRows.length} valid row(s) ready to import` : 'UTF-8 CSV (comma or semicolon separated)'}
+                </span>
+              </button>
+
+              {importRows.length > 0 && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="max-h-48 overflow-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
+                        <tr>
+                          <th className="py-2 px-3">Code</th>
+                          <th className="py-2 px-3">Name (EN)</th>
+                          <th className="py-2 px-3">Status</th>
+                          <th className="py-2 px-3">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {importRows.slice(0, 6).map((row, idx) => (
+                          <tr key={`${row.code}-${idx}`}>
+                            <td className="py-1.5 px-3 font-mono font-bold text-slate-800">{row.code}</td>
+                            <td className="py-1.5 px-3 text-slate-700">{row.nameEn}</td>
+                            <td className="py-1.5 px-3 font-semibold">{row.status}</td>
+                            <td className="py-1.5 px-3 text-slate-500">{row.source}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {importRows.length > 6 && (
+                    <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500">
+                      Showing first 6 of {importRows.length} rows
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={importRows.length === 0 || isImporting}
+                  onClick={handleConfirmAdditiveImport}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isImporting ? 'Importing...' : `Import ${importRows.length} Additives`}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

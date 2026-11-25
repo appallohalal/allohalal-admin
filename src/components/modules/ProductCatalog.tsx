@@ -6,6 +6,7 @@ import { APP_COLORS } from '@/lib/colors';
 import { toast } from '@/lib/toast';
 import { KNOWN_CERTIFIERS } from '@/lib/certifiers';
 import { uploadProductFile } from '@/lib/storage';
+import { parseCsvText, pickCsvField } from '@/lib/csv';
 import {
   ShieldAlert,
   CheckCircle2,
@@ -60,7 +61,9 @@ interface ProductCatalogProps {
   ) => void;
   onSaveProduct?: (product: Product, unknownProductId?: string) => Promise<void> | void;
   onDeleteProduct?: (productId: string) => Promise<void> | void;
+  onRefreshProducts?: () => Promise<void>;
   currentAdminName?: string;
+  currentUserId?: string;
   currentUserRole?: string;
   searchQuery: string;
   prefillData?: ProductPrefillData | null;
@@ -72,7 +75,9 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   onUpdateStatus,
   onSaveProduct,
   onDeleteProduct,
+  onRefreshProducts,
   currentAdminName = 'Senior Halal Auditor',
+  currentUserId,
   currentUserRole = 'Super Admin',
   searchQuery,
   prefillData,
@@ -118,6 +123,13 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   const [activeUnknownProductId, setActiveUnknownProductId] = useState<string | undefined>(undefined);
   const proofInputRef = useRef<HTMLInputElement | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // CSV Import Modal state
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importRows, setImportRows] = useState<any[]>([]);
+  const [importFileName, setImportFileName] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const csvImportInputRef = useRef<HTMLInputElement | null>(null);
 
   // Quick Override Modal State
   const [selectedStatus, setSelectedStatus] = useState<HalalStatus>('HALAL');
@@ -514,6 +526,125 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
     toast.success(`Exported ${listToExport.length} product(s) to CSV successfully!`, 'CSV Export');
   };
 
+  const downloadProductCsvTemplate = () => {
+    const headers = [
+      'Barcode',
+      'Name',
+      'Brand',
+      'Status',
+      'Certifier',
+      'Official Verification (Allo Halal)',
+      'Moderator Note',
+      'Additives',
+      'Ingredients',
+      'Image URL',
+    ];
+    const sample = [
+      '"3017620422003","Nuggets de poulet","Marque exemple","HALAL","AVS","Yes","Verified Halal product","E322, E471","Chicken, flour, salt",""',
+      '"3228857000166","Chocolat Noir 70%","Exemple Bio","HALAL","","No","No haram ingredients","","Cocoa mass, sugar, cocoa butter",""',
+    ];
+    const csv = '\uFEFF' + [headers.join(','), ...sample].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'allohalal_products_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleProductCsvSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { rows } = parseCsvText(text);
+      const mapped = rows
+        .map((r) => {
+          const barcodeVal = pickCsvField(r, ['Barcode', 'Code-barres', 'EAN', 'GTIN']);
+          const nameVal = pickCsvField(r, ['Name', 'Product Name', 'Nom']);
+          const brandVal = pickCsvField(r, ['Brand', 'Marque']);
+          const statusVal =
+            pickCsvField(r, ['Status', 'Manual Override Status', 'AI Status', 'Statut']) || 'HALAL';
+          const certifierVal = pickCsvField(r, ['Certifier', 'Certificateur']);
+          const isCertifiedVal = pickCsvField(r, ['Is Certified', 'Certified']);
+          const verifiedOfficialVal = pickCsvField(r, [
+            'Official Verification (Allo Halal)',
+            'Official Verification',
+            'Verified Official',
+          ]);
+          const noteVal = pickCsvField(r, ['Moderator Note', 'Note']);
+          const additivesVal = pickCsvField(r, ['Additives', 'E-Numbers']);
+          const ingredientsVal = pickCsvField(r, ['Ingredients', 'Ingredients List', 'Ingrédients']);
+          const imageUrlVal = pickCsvField(r, ['Image URL', 'Image']);
+
+          return {
+            barcode: barcodeVal,
+            name: nameVal,
+            brand: brandVal,
+            status: statusVal,
+            certifier: certifierVal,
+            isCertified: isCertifiedVal,
+            verifiedOfficial: verifiedOfficialVal,
+            moderatorNote: noteVal,
+            additives: additivesVal,
+            ingredientsRaw: ingredientsVal,
+            imageUrl: imageUrlVal,
+          };
+        })
+        .filter((item) => item.barcode && item.name);
+
+      if (mapped.length === 0) {
+        toast.error(
+          'No valid rows found. Ensure your CSV has Barcode and Name columns.',
+          'Invalid CSV'
+        );
+        return;
+      }
+      setImportFileName(file.name);
+      setImportRows(mapped);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to parse CSV file.', 'CSV Error');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleConfirmProductImport = async () => {
+    if (importRows.length === 0 || isImporting) return;
+    setIsImporting(true);
+    try {
+      const res = await fetch('/api/v1/products/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actorId: currentUserId,
+          items: importRows,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Import failed.');
+      }
+      if (onRefreshProducts) {
+        await onRefreshProducts();
+      }
+      toast.success(
+        `Imported ${data.created} new, ${data.updated} updated${data.skipped ? `, ${data.skipped} skipped` : ''}.`,
+        'Products CSV Imported'
+      );
+      setIsImportModalOpen(false);
+      setImportRows([]);
+      setImportFileName('');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to import products CSV.', 'Import Error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 pb-16">
       {/* 1. Top Header Banner with "+ Add New Product" and "Export CSV" Buttons */}
@@ -557,6 +688,22 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
             >
               <Download className="w-4 h-4 text-slate-600" />
               <span>Export CSV ({filtered.length})</span>
+            </button>
+          )}
+
+          {perms.canAddProduct && (
+            <button
+              type="button"
+              onClick={() => {
+                setImportRows([]);
+                setImportFileName('');
+                setIsImportModalOpen(true);
+              }}
+              className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 shadow-2xs flex items-center gap-2 transition-all cursor-pointer active:scale-98"
+              title="Import products from CSV / Excel"
+            >
+              <Upload className="w-4 h-4 text-slate-600" />
+              <span>Import CSV</span>
             </button>
           )}
 
@@ -1739,6 +1886,123 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
               >
                 Delete Product
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Products CSV Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center border ${c.primaryLightBg} ${c.primaryText} ${c.primaryLightBorder}`}>
+                  <Upload className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Import Products from CSV</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Bulk-add or update products by Barcode (also accepts Export CSV files)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <FileText className="w-4 h-4 text-[#088839]" />
+                  <span>Need a template? Download a sample CSV file.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={downloadProductCsvTemplate}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Template</span>
+                </button>
+              </div>
+
+              <input
+                ref={csvImportInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleProductCsvSelected}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => csvImportInputRef.current?.click()}
+                className="w-full py-6 border-2 border-dashed border-slate-300 hover:border-[#088839] rounded-xl bg-slate-50/50 hover:bg-[#e6f4eb]/30 transition-colors flex flex-col items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Upload className="w-6 h-6 text-[#088839]" />
+                <span className="text-xs font-bold text-slate-800">
+                  {importFileName ? `Selected: ${importFileName}` : 'Click to choose a .csv file'}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {importRows.length > 0 ? `${importRows.length} valid row(s) ready to import` : 'UTF-8 CSV (comma or semicolon separated)'}
+                </span>
+              </button>
+
+              {importRows.length > 0 && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="max-h-48 overflow-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
+                        <tr>
+                          <th className="py-2 px-3">Barcode</th>
+                          <th className="py-2 px-3">Name</th>
+                          <th className="py-2 px-3">Brand</th>
+                          <th className="py-2 px-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {importRows.slice(0, 6).map((row, idx) => (
+                          <tr key={`${row.barcode}-${idx}`}>
+                            <td className="py-1.5 px-3 font-mono font-bold text-slate-800">{row.barcode}</td>
+                            <td className="py-1.5 px-3 text-slate-700">{row.name}</td>
+                            <td className="py-1.5 px-3 text-slate-500">{row.brand || '—'}</td>
+                            <td className="py-1.5 px-3 font-semibold">{row.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {importRows.length > 6 && (
+                    <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500">
+                      Showing first 6 of {importRows.length} rows
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={importRows.length === 0 || isImporting}
+                  onClick={handleConfirmProductImport}
+                  className={`px-5 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-50 cursor-pointer flex items-center gap-1.5 ${c.primaryBg} ${c.primaryBgHover}`}
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{isImporting ? 'Importing...' : `Import ${importRows.length} Products`}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

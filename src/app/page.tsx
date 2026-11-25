@@ -508,7 +508,9 @@ export default function AdminDashboardPage() {
                 onUpdateStatus={handleUpdateProductStatus}
                 onSaveProduct={handleSaveProduct}
                 onDeleteProduct={handleDeleteProduct}
+                onRefreshProducts={async () => setProducts(await fetchProducts())}
                 currentAdminName={currentUser?.name}
+                currentUserId={currentUser?.id}
                 currentUserRole={currentUser?.role}
                 searchQuery={searchQuery}
                 prefillData={productPrefill}
@@ -548,6 +550,7 @@ export default function AdminDashboardPage() {
                 additives={additives}
                 onSaveAdditive={handleSaveAdditive}
                 onDeleteAdditive={handleDeleteAdditive}
+                onRefreshAdditives={async () => setAdditives(await fetchAdditives())}
                 currentUserRole={currentUser?.role}
                 searchQuery={searchQuery}
               />
