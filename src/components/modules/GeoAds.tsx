@@ -42,9 +42,9 @@ import {
 
 interface GeoAdsProps {
   ads: GeoAd[];
-  onSaveAd: (ad: GeoAd) => void;
-  onToggleActive: (adId: string) => void;
-  onDeleteAd?: (adId: string) => void;
+  onSaveAd: (ad: GeoAd) => Promise<void> | void;
+  onToggleActive: (adId: string) => Promise<void> | void;
+  onDeleteAd?: (adId: string) => Promise<void> | void;
   searchQuery: string;
 }
 
@@ -260,13 +260,13 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newAd: GeoAd = {
       id: editingAd ? editingAd.id : `ad-${Date.now()}`,
       title: title.trim(),
       sponsorName: sponsorName.trim(),
-      category: category || 'restaurant',
+      category: category || 'Restaurant',
       bannerImageUrl: bannerImageUrl.trim(),
       targetUrl: targetUrl.trim(),
       latitude: Number(latitude),
@@ -281,14 +281,18 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
       startDate: editingAd ? editingAd.startDate : new Date().toISOString(),
     };
 
-    onSaveAd(newAd);
-    toast.success(
-      editingAd
-        ? `Campaign "${newAd.title}" updated successfully.`
-        : `Campaign "${newAd.title}" created and live.`,
-      editingAd ? 'Campaign Updated' : 'Campaign Created'
-    );
-    setIsModalOpen(false);
+    try {
+      await onSaveAd(newAd);
+      toast.success(
+        editingAd
+          ? `Campaign "${newAd.title}" updated successfully.`
+          : `Campaign "${newAd.title}" created and live.`,
+        editingAd ? 'Campaign Updated' : 'Campaign Created'
+      );
+      setIsModalOpen(false);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to save Geo Ad campaign.', 'Save Error');
+    }
   };
 
   const handleToggle = (ad: GeoAd) => {
@@ -868,14 +872,21 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
                 ) : null}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-slate-950/25" />
 
-                <div className="absolute top-3 inset-x-3 flex items-center justify-between">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                    <span className="text-[10px] font-extrabold text-white uppercase tracking-wider">
-                      Featured Partner
-                    </span>
+                <div className="absolute top-3 inset-x-3 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-900/70 border border-white/20 backdrop-blur-md">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span className="text-[10px] font-extrabold text-white uppercase tracking-wider">
+                        {partnerBadge.trim() || 'PARTENAIRE RECOMMANDÉ'}
+                      </span>
+                    </div>
+                    {category.trim() && (
+                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-900/70 border border-emerald-400/40 backdrop-blur-md text-[10px] font-extrabold text-emerald-300 uppercase tracking-wider">
+                        <span>{category.trim()}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900/60 border border-white/20 backdrop-blur-md text-[10px] font-bold text-white">
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-900/70 border border-white/20 backdrop-blur-md text-[10px] font-bold text-white shrink-0">
                     <MapPin className="w-3 h-3 text-blue-400" />
                     <span>{locationName || 'Target Area'}</span>
                   </div>
@@ -883,6 +894,12 @@ export const GeoAds: React.FC<GeoAdsProps> = ({
 
                 <div className="absolute bottom-3 inset-x-3 flex items-end justify-between gap-3">
                   <div className="min-w-0 flex-1">
+                    {certifyingBody.trim() && (
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 mb-1 rounded-full bg-emerald-950/80 border border-emerald-400/40 backdrop-blur-md text-[9.5px] font-bold text-emerald-300">
+                        <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" />
+                        <span>Certifié par : {certifyingBody.trim()}</span>
+                      </div>
+                    )}
                     <div className="text-[10px] font-extrabold text-blue-300 uppercase tracking-wider truncate">
                       {sponsorName || 'Sponsor Name'}
                     </div>

@@ -50,6 +50,11 @@ export async function GET(req: NextRequest) {
         latitude: ad.latitude,
         longitude: ad.longitude,
         radiusKm: ad.radius_km,
+        locationName: ad.location_name || '',
+        partnerBadge: ad.partner_badge || 'PARTENAIRE RECOMMANDÉ',
+        certifyingBody: ad.certifying_body || '',
+        impressionCount: ad.impressions ?? 0,
+        clickCount: ad.click_count ?? ad.clicks ?? 0,
         distanceKm,
         isWithinRadius: distanceKm <= (ad.radius_km || 15.0),
       };
@@ -79,14 +84,14 @@ export async function POST(req: NextRequest) {
 
     const { data: current } = await supabase
       .from('geo_ads')
-      .select('impression_count, click_count')
+      .select('impressions, click_count')
       .eq('id', adId)
       .maybeSingle();
 
     if (current) {
       const updates =
         event === 'impression'
-          ? { impression_count: (current.impression_count || 0) + 1 }
+          ? { impressions: (current.impressions || 0) + 1 }
           : { click_count: (current.click_count || 0) + 1 };
 
       await supabase.from('geo_ads').update(updates).eq('id', adId);

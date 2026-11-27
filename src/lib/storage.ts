@@ -548,8 +548,8 @@ export const fetchAds = async (): Promise<GeoAd[]> => {
         partnerBadge: item.partner_badge || 'PARTENAIRE RECOMMANDÉ',
         certifyingBody: item.certifying_body || '',
         isActive: item.is_active !== false,
-        impressionCount: item.impression_count || 0,
-        clickCount: item.click_count || 0,
+        impressionCount: item.impressions ?? item.impression_count ?? 0,
+        clickCount: item.click_count ?? item.clicks ?? 0,
         startDate: item.start_date || item.created_at,
         endDate: item.end_date,
       }));
@@ -574,29 +574,31 @@ export const fetchAds = async (): Promise<GeoAd[]> => {
 };
 
 export const saveGeoAd = async (ad: GeoAd): Promise<GeoAd[]> => {
-  try {
-    const payload: Record<string, any> = {
-      title: ad.title,
-      sponsor_name: ad.sponsorName,
-      category: ad.category || 'Restaurant',
-      banner_image_url: ad.bannerImageUrl,
-      target_url: ad.targetUrl,
-      latitude: ad.latitude,
-      longitude: ad.longitude,
-      radius_km: ad.radiusKm,
-      location_name: ad.locationName,
-      partner_badge: ad.partnerBadge || 'PARTENAIRE RECOMMANDÉ',
-      certifying_body: ad.certifyingBody || '',
-      is_active: ad.isActive,
-      impression_count: ad.impressionCount,
-      click_count: ad.clickCount,
-    };
-    if (ad.id && !ad.id.startsWith('ad-')) {
-      payload.id = ad.id;
-    }
-    await supabase.from('geo_ads').upsert(payload);
-  } catch (err) {
-    console.warn('Supabase save ad note:', err);
+  const payload: Record<string, any> = {
+    title: ad.title,
+    sponsor_name: ad.sponsorName,
+    category: ad.category || 'Restaurant',
+    banner_image_url: ad.bannerImageUrl,
+    target_url: ad.targetUrl,
+    latitude: ad.latitude,
+    longitude: ad.longitude,
+    radius_km: ad.radiusKm,
+    location_name: ad.locationName,
+    partner_badge: ad.partnerBadge || 'PARTENAIRE RECOMMANDÉ',
+    certifying_body: ad.certifyingBody || '',
+    is_active: ad.isActive,
+    impressions: ad.impressionCount || 0,
+    click_count: ad.clickCount || 0,
+    updated_at: new Date().toISOString(),
+  };
+  if (ad.id && !ad.id.startsWith('ad-')) {
+    payload.id = ad.id;
+  }
+
+  const { error } = await supabase.from('geo_ads').upsert(payload);
+  if (error) {
+    console.error('Supabase save ad error:', error);
+    throw new Error(error.message || 'Failed to save Geo Ad campaign.');
   }
 
   return fetchAds();
